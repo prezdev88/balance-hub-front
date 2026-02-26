@@ -11,6 +11,7 @@ export type Debtor = {
   id: string;
   name: string;
   email: string;
+  totalDebt: string;
 };
 
 export type ListDebtorsResponse = {

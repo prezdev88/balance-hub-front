@@ -10,6 +10,12 @@ type AppNotice = {
   text: string;
 } | null;
 
+type PendingRecurringDelete = {
+  id: string;
+  description: string;
+  type: ExpenseType;
+} | null;
+
 type RecurringState = {
   FIXED: RecurringExpense[];
   OPTIONAL: RecurringExpense[];
@@ -51,11 +57,32 @@ function formatCurrency(value: string | number): string {
   }).format(numeric);
 }
 
+function formatAmountInput(value: string): string {
+  const digitsOnly = value.replace(/\D/g, "");
+  if (!digitsOnly) return "";
+  return new Intl.NumberFormat("es-CL", {
+    maximumFractionDigits: 0
+  }).format(Number(digitsOnly));
+}
+
+function parseAmountInput(value: string): number {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly ? Number(digitsOnly) : 0;
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("es-CL");
+}
+
+function getExpenseTypeLabel(type: ExpenseType): string {
+  return type === "FIXED" ? "Fijo" : "Opcional";
+}
+
+function getExpenseTypeClassName(type: ExpenseType): string {
+  return type === "FIXED" ? "expense-fixed" : "expense-optional";
 }
 
 function Section({
@@ -88,6 +115,7 @@ function App() {
   const [recurringTotals, setRecurringTotals] = useState<RecurringTotals>(EMPTY_TOTALS);
   const [debtsResult, setDebtsResult] = useState<GetDebtsResponse | null>(null);
   const [debtsLoading, setDebtsLoading] = useState(false);
+  const [pendingRecurringDelete, setPendingRecurringDelete] = useState<PendingRecurringDelete>(null);
 
   const [debtorForm, setDebtorForm] = useState({ name: "", email: "" });
   const [salaryAmount, setSalaryAmount] = useState("");
@@ -239,7 +267,7 @@ function App() {
     event.preventDefault();
     setNotice(null);
     try {
-      const created = await api.createSalary({ amount: Number(salaryAmount) });
+      const created = await api.createSalary({ amount: parseAmountInput(salaryAmount) });
       setSalaryAmount("");
       setSalaryLastCreated(created);
       setNotice({ type: "success", text: "Sueldo registrado correctamente." });
@@ -254,7 +282,7 @@ function App() {
     try {
       await api.createRecurringExpense({
         description: recurringForm.description.trim(),
-        amount: Number(recurringForm.amount),
+        amount: parseAmountInput(recurringForm.amount),
         type: recurringForm.type
       });
       const typeToRefresh = recurringForm.type;
@@ -273,7 +301,7 @@ function App() {
     try {
       await api.updateRecurringExpense(recurringEditing.id, {
         description: recurringEditing.description.trim(),
-        amount: Number(recurringEditing.amount)
+        amount: parseAmountInput(recurringEditing.amount)
       });
       const typeToRefresh = recurringEditing.type;
       setRecurringEditing(null);
@@ -284,6 +312,38 @@ function App() {
     }
   }
 
+  async function deleteRecurringExpenseByTarget(target: {
+    id: string;
+    description: string;
+    type: ExpenseType;
+  }) {
+    setNotice(null);
+    try {
+      await api.deleteRecurringExpense(target.id);
+      setRecurringEditing((current) => (current?.id === target.id ? null : current));
+      await reloadRecurring(target.type);
+      setNotice({ type: "success", text: "Gasto recurrente eliminado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleDeleteRecurringExpense() {
+    if (!recurringEditing) return;
+    setPendingRecurringDelete({
+      id: recurringEditing.id,
+      description: recurringEditing.description,
+      type: recurringEditing.type
+    });
+  }
+
+  async function confirmDeleteRecurringExpense() {
+    if (!pendingRecurringDelete) return;
+    const target = pendingRecurringDelete;
+    setPendingRecurringDelete(null);
+    await deleteRecurringExpenseByTarget(target);
+  }
+
   async function handleCreateDebt(event: React.FormEvent) {
     event.preventDefault();
     setNotice(null);
@@ -292,11 +352,11 @@ function App() {
         debt: {
           debtorId: debtForm.debtorId,
           description: debtForm.description.trim(),
-          totalAmount: Number(debtForm.totalAmount)
+          totalAmount: parseAmountInput(debtForm.totalAmount)
         },
         installments: {
           installmentsCount: Number(debtForm.installmentsCount),
-          installmentAmount: Number(debtForm.installmentAmount),
+          installmentAmount: parseAmountInput(debtForm.installmentAmount),
           firstInstallmentDueDate: debtForm.firstInstallmentDueDate
         }
       });
@@ -310,6 +370,8 @@ function App() {
         firstInstallmentDueDate: getTodayDate()
       }));
       setNotice({ type: "success", text: "Deuda creada correctamente." });
+
+      await reloadDebtors();
 
       if (debtQuery.debtorId === debtForm.debtorId) {
         startTransition(() => {
@@ -345,6 +407,7 @@ function App() {
     try {
       await api.payInstallment(installmentId, { paymentDate: new Date().toISOString() });
       setNotice({ type: "success", text: "Cuota marcada como pagada." });
+      await reloadDebtors();
       if (debtsResult) {
         startTransition(() => {
           void runDebtQuery();
@@ -394,6 +457,83 @@ function App() {
         </div>
       ) : null}
 
+      {recurringEditing ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setRecurringEditing(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-recurring-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <form className="form-grid" onSubmit={handleUpdateRecurringExpense}>
+              <h3 id="edit-recurring-title">Editar gasto ({getExpenseTypeLabel(recurringEditing.type)})</h3>
+              <label>
+                Descripción
+                <input
+                  value={recurringEditing.description}
+                  onChange={(event) =>
+                    setRecurringEditing((current) =>
+                      current ? { ...current, description: event.target.value } : current
+                    )
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Monto
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={recurringEditing.amount}
+                  onChange={(event) =>
+                    setRecurringEditing((current) =>
+                      current ? { ...current, amount: formatAmountInput(event.target.value) } : current
+                    )
+                  }
+                  required
+                />
+              </label>
+              <div className="form-actions split">
+                <button type="submit">Guardar cambios</button>
+                <button type="button" className="danger" onClick={() => void handleDeleteRecurringExpense()}>
+                  Eliminar
+                </button>
+                <button type="button" className="secondary" onClick={() => setRecurringEditing(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingRecurringDelete ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingRecurringDelete(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-recurring-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="delete-recurring-title">Confirmar eliminación</h3>
+            <p>
+              ¿Deseas eliminar <strong>{pendingRecurringDelete.description}</strong> (
+              {getExpenseTypeLabel(pendingRecurringDelete.type)})?
+            </p>
+            <div className="form-actions split">
+              <button type="button" className="danger" onClick={() => void confirmDeleteRecurringExpense()}>
+                Sí, eliminar
+              </button>
+              <button type="button" className="secondary" onClick={() => setPendingRecurringDelete(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {bootLoading ? <div className="panel">Cargando datos iniciales...</div> : null}
 
       {!bootLoading && (
@@ -431,19 +571,21 @@ function App() {
                     <tr>
                       <th>Nombre</th>
                       <th>Email</th>
+                      <th>Deuda pendiente</th>
                       <th>ID</th>
                     </tr>
                   </thead>
                   <tbody>
                     {debtors.length === 0 ? (
                       <tr>
-                        <td colSpan={3}>No hay deudores registrados.</td>
+                        <td colSpan={4}>No hay deudores registrados.</td>
                       </tr>
                     ) : (
                       debtors.map((debtor) => (
                         <tr key={debtor.id}>
                           <td>{debtor.name}</td>
                           <td>{debtor.email}</td>
+                          <td>{formatCurrency(debtor.totalDebt)}</td>
                           <td className="mono">{debtor.id}</td>
                         </tr>
                       ))
@@ -460,11 +602,10 @@ function App() {
                 <label>
                   Monto
                   <input
-                    type="number"
-                    min="0"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
                     value={salaryAmount}
-                    onChange={(event) => setSalaryAmount(event.target.value)}
+                    onChange={(event) => setSalaryAmount(formatAmountInput(event.target.value))}
                     placeholder="1500000"
                     required
                   />
@@ -493,14 +634,14 @@ function App() {
           {(activeTab === "overview" || activeTab === "recurring") && (
             <Section
               title="Gastos Recurrentes"
-              description="Crear, listar, totalizar y actualizar gastos `FIXED` y `OPTIONAL`."
+              description="Crear, listar, totalizar y actualizar gastos fijos y opcionales."
             >
               <div className="summary-row">
-                <div className="stat">
+                <div className="stat expense-fixed">
                   <span>Fijos</span>
                   <strong>{formatCurrency(recurringTotals.FIXED)}</strong>
                 </div>
-                <div className="stat">
+                <div className="stat expense-optional">
                   <span>Opcionales</span>
                   <strong>{formatCurrency(recurringTotals.OPTIONAL)}</strong>
                 </div>
@@ -523,11 +664,12 @@ function App() {
                 <label>
                   Monto
                   <input
-                    type="number"
-                    min="0"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
                     value={recurringForm.amount}
-                    onChange={(event) => setRecurringForm((c) => ({ ...c, amount: event.target.value }))}
+                    onChange={(event) =>
+                      setRecurringForm((c) => ({ ...c, amount: formatAmountInput(event.target.value) }))
+                    }
                     placeholder="350000"
                     required
                   />
@@ -540,8 +682,8 @@ function App() {
                       setRecurringForm((c) => ({ ...c, type: event.target.value as ExpenseType }))
                     }
                   >
-                    <option value="FIXED">FIXED</option>
-                    <option value="OPTIONAL">OPTIONAL</option>
+                    <option value="FIXED">{getExpenseTypeLabel("FIXED")}</option>
+                    <option value="OPTIONAL">{getExpenseTypeLabel("OPTIONAL")}</option>
                   </select>
                 </label>
                 <div className="form-actions">
@@ -549,50 +691,11 @@ function App() {
                 </div>
               </form>
 
-              {recurringEditing ? (
-                <form className="form-grid edit-box" onSubmit={handleUpdateRecurringExpense}>
-                  <h3>Editar gasto ({recurringEditing.type})</h3>
-                  <label>
-                    Descripción
-                    <input
-                      value={recurringEditing.description}
-                      onChange={(event) =>
-                        setRecurringEditing((current) =>
-                          current ? { ...current, description: event.target.value } : current
-                        )
-                      }
-                      required
-                    />
-                  </label>
-                  <label>
-                    Monto
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={recurringEditing.amount}
-                      onChange={(event) =>
-                        setRecurringEditing((current) =>
-                          current ? { ...current, amount: event.target.value } : current
-                        )
-                      }
-                      required
-                    />
-                  </label>
-                  <div className="form-actions split">
-                    <button type="submit">Guardar cambios</button>
-                    <button type="button" className="secondary" onClick={() => setRecurringEditing(null)}>
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              ) : null}
-
               <div className="two-columns">
                 {(["FIXED", "OPTIONAL"] as ExpenseType[]).map((type) => (
-                  <div className="subpanel" key={type}>
+                  <div className={`subpanel ${getExpenseTypeClassName(type)}`} key={type}>
                     <div className="subpanel-title">
-                      <h3>{type}</h3>
+                      <h3>{getExpenseTypeLabel(type)}</h3>
                       <button type="button" className="secondary" onClick={() => void reloadRecurring(type)}>
                         Recargar
                       </button>
@@ -602,26 +705,45 @@ function App() {
                         <li className="list-item empty">Sin gastos de este tipo.</li>
                       ) : (
                         recurringExpenses[type].map((item) => (
-                          <li key={item.id} className="list-item">
+                          <li key={item.id} className={`list-item ${getExpenseTypeClassName(type)}`}>
                             <div>
                               <p className="list-title">{item.description}</p>
                               <p className="muted">{formatCurrency(item.amount)}</p>
                               <p className="mono">{item.id}</p>
                             </div>
-                            <button
-                              type="button"
-                              className="secondary"
-                              onClick={() =>
-                                setRecurringEditing({
-                                  id: item.id,
-                                  type,
-                                  description: item.description,
-                                  amount: String(Number(item.amount))
-                                })
-                              }
-                            >
-                              Editar
-                            </button>
+                            <div className="item-actions">
+                              <button
+                                type="button"
+                                className="icon-btn secondary"
+                                aria-label={`Editar ${item.description}`}
+                                title="Editar"
+                                onClick={() =>
+                                  setRecurringEditing({
+                                    id: item.id,
+                                    type,
+                                    description: item.description,
+                                    amount: formatAmountInput(String(Number(item.amount)))
+                                  })
+                                }
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn danger"
+                                aria-label={`Eliminar ${item.description}`}
+                                title="Eliminar"
+                                onClick={() =>
+                                  setPendingRecurringDelete({
+                                    id: item.id,
+                                    description: item.description,
+                                    type
+                                  })
+                                }
+                              >
+                                ×
+                              </button>
+                            </div>
                           </li>
                         ))
                       )}
@@ -670,11 +792,12 @@ function App() {
                     <label>
                       Monto total
                       <input
-                        type="number"
-                        min="0"
-                        step="1"
+                        type="text"
+                        inputMode="numeric"
                         value={debtForm.totalAmount}
-                        onChange={(event) => setDebtForm((c) => ({ ...c, totalAmount: event.target.value }))}
+                        onChange={(event) =>
+                          setDebtForm((c) => ({ ...c, totalAmount: formatAmountInput(event.target.value) }))
+                        }
                         required
                       />
                     </label>
@@ -694,12 +817,14 @@ function App() {
                     <label>
                       Monto por cuota
                       <input
-                        type="number"
-                        min="0"
-                        step="1"
+                        type="text"
+                        inputMode="numeric"
                         value={debtForm.installmentAmount}
                         onChange={(event) =>
-                          setDebtForm((c) => ({ ...c, installmentAmount: event.target.value }))
+                          setDebtForm((c) => ({
+                            ...c,
+                            installmentAmount: formatAmountInput(event.target.value)
+                          }))
                         }
                         required
                       />

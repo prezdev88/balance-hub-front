@@ -98,6 +98,11 @@ export const api = {
       bodyJson: payload
     });
   },
+  deleteRecurringExpense(id: string) {
+    return request<void>(`/api/recurring-expenses/${id}`, {
+      method: "DELETE"
+    });
+  },
   createDebt(payload: {
     debt: { debtorId: string; description: string; totalAmount: number };
     installments: {
