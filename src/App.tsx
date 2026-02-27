@@ -13,6 +13,7 @@ import type {
 } from "./types";
 
 type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary";
+type ThemeMode = "light" | "dark";
 
 type AppNotice = {
   type: "success" | "error";
@@ -169,6 +170,12 @@ function Section({
 }
 
 function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") return "light";
+    const saved = window.localStorage.getItem("balance-hub-theme");
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
   const [activeTab, setActiveTab] = useState<TabKey>("debtors");
   const [bootLoading, setBootLoading] = useState(true);
   const [notice, setNotice] = useState<AppNotice>(null);
@@ -238,6 +245,11 @@ function App() {
   useEffect(() => {
     void loadInitialData();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", themeMode);
+    window.localStorage.setItem("balance-hub-theme", themeMode);
+  }, [themeMode]);
 
   async function loadInitialData() {
     setBootLoading(true);
@@ -713,7 +725,16 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <h1>Balance Hub</h1>
+          <div className="header-top">
+            <h1>Balance Hub</h1>
+            <button
+              type="button"
+              className="secondary theme-toggle"
+              onClick={() => setThemeMode((current) => (current === "dark" ? "light" : "dark"))}
+            >
+              {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
+            </button>
+          </div>
         </div>
       </header>
 

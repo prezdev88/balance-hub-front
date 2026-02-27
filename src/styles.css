@@ -43,6 +43,17 @@ select {
   font-size: clamp(1.4rem, 2.6vw, 2.1rem);
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.theme-toggle {
+  white-space: nowrap;
+}
+
 .eyebrow {
   margin: 0;
   text-transform: uppercase;
@@ -541,4 +552,111 @@ th {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #d9e6f7;
+  background: #0d1624;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(43, 119, 200, 0.18), transparent 35%),
+    radial-gradient(circle at 90% 0%, rgba(34, 163, 126, 0.16), transparent 30%),
+    #0d1624;
+}
+
+:root[data-theme="dark"] .tab {
+  border-color: #2b3e57;
+  background: #121f31;
+  color: #bdd3f0;
+}
+
+:root[data-theme="dark"] .tab.active {
+  background: #2a6db2;
+  border-color: #2a6db2;
+  color: #f2f8ff;
+}
+
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .subpanel,
+:root[data-theme="dark"] .list-item,
+:root[data-theme="dark"] .info-card,
+:root[data-theme="dark"] .stat,
+:root[data-theme="dark"] .debt-card,
+:root[data-theme="dark"] .edit-box,
+:root[data-theme="dark"] .modal {
+  background: #111c2c;
+  border-color: #24364e;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .panel-header p,
+:root[data-theme="dark"] .muted,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] .stat span,
+:root[data-theme="dark"] .modal p {
+  color: #95abca;
+}
+
+:root[data-theme="dark"] .panel-header h2,
+:root[data-theme="dark"] .stat strong,
+:root[data-theme="dark"] td,
+:root[data-theme="dark"] .list-title,
+:root[data-theme="dark"] .subpanel h3 {
+  color: #e4eefc;
+}
+
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] td {
+  border-bottom-color: #24364e;
+}
+
+:root[data-theme="dark"] .form-grid label {
+  color: #c6d9f3;
+}
+
+:root[data-theme="dark"] .form-grid input,
+:root[data-theme="dark"] .form-grid select {
+  border-color: #2d4461;
+  background: #0d1624;
+  color: #e5efff;
+}
+
+:root[data-theme="dark"] button.secondary {
+  background: #16253a;
+  color: #cfe1fb;
+  border-color: #2e4464;
+}
+
+:root[data-theme="dark"] .link-btn {
+  color: #7fb8ff;
+}
+
+:root[data-theme="dark"] .notice.success {
+  background: #113123;
+  border-color: #1f5941;
+  color: #b8ebcb;
+}
+
+:root[data-theme="dark"] .notice.error {
+  background: #3a1b1b;
+  border-color: #6d2f2f;
+  color: #f8caca;
+}
+
+:root[data-theme="dark"] .badge.success {
+  background: #174332;
+  color: #b9f0ce;
+}
+
+:root[data-theme="dark"] .badge.warning {
+  background: #4a3511;
+  color: #ffdca0;
 }
