@@ -2,10 +2,15 @@ import type {
   ApiErrorResponse,
   CreateDebtResponse,
   CreateDebtorResponse,
+  GetDebtDetailResponse,
   CreateRecurringExpenseResponse,
+  CreateSavingsGoalResponse,
   CreateSalaryResponse,
   ExpenseType,
-  GetDebtsResponse,
+  GetMonthlyFreeAmountResponse,
+  SalarySnapshot,
+  PayMonthlySalaryResponse,
+  GetUnpaidInstallmentsByMonthResponse,
   ListDebtorsResponse,
   ListRecurringExpensesResponse,
   RecurringExpensesTotalResponse,
@@ -60,6 +65,23 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await response.json()) as T;
 }
 
+async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const { bodyJson, headers, ...rest } = options;
+  const response = await fetch(path, {
+    ...rest,
+    headers: {
+      ...headers
+    },
+    body: bodyJson !== undefined ? JSON.stringify(bodyJson) : rest.body
+  });
+
+  if (!response.ok) {
+    throw new ApiClientError(`HTTP ${response.status}`, response.status);
+  }
+
+  return response.blob();
+}
+
 export { ApiClientError };
 
 export const api = {
@@ -77,6 +99,38 @@ export const api = {
       method: "POST",
       bodyJson: payload
     });
+  },
+  createSavingsGoal(payload: { amount: number }) {
+    return request<CreateSavingsGoalResponse>("/api/savings-goals", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  getMonthlyFreeAmount(year: number) {
+    const params = new URLSearchParams({ year: String(year) });
+    return request<GetMonthlyFreeAmountResponse>(`/api/financial-plan/monthly-free-amount?${params.toString()}`);
+  },
+  getSalarySnapshot(payload: { debtorId: string; year: number; month: number }) {
+    const params = new URLSearchParams({
+      debtorId: payload.debtorId,
+      year: String(payload.year),
+      month: String(payload.month)
+    });
+    return request<SalarySnapshot>(`/api/salary-snapshots?${params.toString()}`);
+  },
+  payMonthlySalary(payload: { debtorId: string; year: number; month: number; paymentDate: string }) {
+    return request<PayMonthlySalaryResponse>("/api/salary-snapshots/pay", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  downloadMonthlySummaryPdf(payload: { debtorId: string; year: number; month: number }) {
+    const params = new URLSearchParams({
+      debtorId: payload.debtorId,
+      year: String(payload.year),
+      month: String(payload.month)
+    });
+    return requestBlob(`/api/reports/monthly-summary.pdf?${params.toString()}`);
   },
   createRecurringExpense(payload: { description: string; amount: number; type: ExpenseType }) {
     return request<CreateRecurringExpenseResponse>("/api/recurring-expenses", {
@@ -116,14 +170,26 @@ export const api = {
       bodyJson: payload
     });
   },
-  getDebtsByRange(payload: { debtorId: string; startDate: string; endDate: string }) {
-    const params = new URLSearchParams(payload);
-    return request<GetDebtsResponse>(`/api/debts?${params.toString()}`);
+  deleteDebt(debtId: string) {
+    return request<void>(`/api/debts/${debtId}`, {
+      method: "DELETE"
+    });
+  },
+  getDebtDetail(debtId: string) {
+    return request<GetDebtDetailResponse>(`/api/debts/${debtId}`);
   },
   payInstallment(installmentId: string, payload: { paymentDate: string }) {
     return request<void>(`/api/installments/${installmentId}/pay`, {
       method: "PATCH",
       bodyJson: payload
     });
+  },
+  getUnpaidInstallmentsByMonth(payload: { debtorId: string; year: number; month: number }) {
+    const params = new URLSearchParams({
+      debtorId: payload.debtorId,
+      year: String(payload.year),
+      month: String(payload.month)
+    });
+    return request<GetUnpaidInstallmentsByMonthResponse>(`/api/installments/unpaid?${params.toString()}`);
   }
 };

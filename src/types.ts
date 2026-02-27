@@ -28,6 +28,49 @@ export type CreateSalaryResponse = {
   createdAt: string;
 };
 
+export type CreateSavingsGoalResponse = {
+  id: string;
+  amount: string;
+  createdAt: string;
+};
+
+export type MonthlyFreeAmountItem = {
+  month: number;
+  year: number;
+  freeAmount: string;
+};
+
+export type GetMonthlyFreeAmountResponse = {
+  year: number;
+  currentSalary: string;
+  monthlySavingsGoal: string;
+  monthlyFixedExpenses: string;
+  monthlyOptionalExpenses: string;
+  monthlyFreeAmount: string;
+  months: MonthlyFreeAmountItem[];
+};
+
+export type SalarySnapshotStatus = "PENDING" | "PAID";
+
+export type SalarySnapshot = {
+  id: string;
+  debtorId: string;
+  year: number;
+  month: number;
+  monthlyFreeAmount: string;
+  halfFreeAmount: string;
+  totalInstallmentsAmount: string;
+  salaryColumnAmount: string;
+  status: SalarySnapshotStatus;
+  createdAt: string;
+  paidAt: string | null;
+};
+
+export type PayMonthlySalaryResponse = {
+  created: boolean;
+  snapshot: SalarySnapshot;
+};
+
 export type RecurringExpense = {
   id: string;
   description: string;
@@ -64,6 +107,28 @@ export type Installment = {
   amount: string;
 };
 
+export type UnpaidInstallmentByMonthItem = {
+  installmentId: string;
+  debtId: string;
+  debtDescription: string;
+  installmentNumber: number;
+  totalInstallments: number;
+  dueDate: string;
+  amount: string;
+  paid: boolean;
+  paidAt: string | null;
+};
+
+export type GetUnpaidInstallmentsByMonthResponse = {
+  debtorId: string;
+  debtorName: string;
+  debtorEmail: string;
+  year: number;
+  month: number;
+  totalAmount: string;
+  installments: UnpaidInstallmentByMonthItem[];
+};
+
 export type Debt = {
   id: string;
   description: string;
@@ -73,9 +138,9 @@ export type Debt = {
   installments: Installment[];
 };
 
-export type GetDebtsResponse = {
+export type GetDebtDetailResponse = {
   id: string;
   name: string;
   email: string;
-  debts: Debt[];
+  debt: Debt;
 };
