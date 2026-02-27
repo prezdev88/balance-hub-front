@@ -713,12 +713,7 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Balance Hub</p>
-          <h1>Panel de Finanzas Personales</h1>
-          <p className="subtitle">
-            Frontend para tu backend Spring Boot (`/api/debtors`, `/api/debts`, `/api/recurring-expenses`,
-            `/api/salaries`, `/api/installments`).
-          </p>
+          <h1>Balance Hub</h1>
         </div>
       </header>
 
@@ -1165,7 +1160,6 @@ function App() {
                         <th>Estado</th>
                         <th>Pertenece a</th>
                         <th>Cuota</th>
-                        <th>ID cuota</th>
                         <th>Sueldo</th>
                         <th>Acción</th>
                       </tr>
@@ -1173,7 +1167,7 @@ function App() {
                     <tbody>
                       {!unpaidByMonthResult || unpaidByMonthResult.installments.length === 0 ? (
                         <tr>
-                          <td colSpan={8}>No hay cuotas para este filtro.</td>
+                          <td colSpan={7}>No hay cuotas para este filtro.</td>
                         </tr>
                       ) : (
                         unpaidByMonthResult.installments.map((item) => (
@@ -1197,7 +1191,6 @@ function App() {
                             <td>
                               {item.installmentNumber}/{item.totalInstallments}
                             </td>
-                            <td className="mono">{item.installmentId}</td>
                             <td>{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
                             <td>
                               {item.paid ? (
