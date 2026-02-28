@@ -1015,7 +1015,7 @@ function App() {
                   </p>
 
                   <div className="table-wrap">
-                    <table>
+                    <table className="card-table">
                       <thead>
                         <tr>
                           <th>#</th>
@@ -1028,11 +1028,11 @@ function App() {
                       <tbody>
                         {debtDetailVisibleInstallments.map((installment) => (
                           <tr key={installment.id}>
-                            <td>{installment.number}</td>
-                            <td>{formatDate(installment.dueDate)}</td>
-                            <td>{formatCurrency(installment.amount)}</td>
-                            <td>{installment.paidAt ? formatDate(installment.paidAt) : "No"}</td>
-                            <td>
+                            <td data-label="#"> {installment.number}</td>
+                            <td data-label="Vence">{formatDate(installment.dueDate)}</td>
+                            <td data-label="Monto">{formatCurrency(installment.amount)}</td>
+                            <td data-label="Pagada">{installment.paidAt ? formatDate(installment.paidAt) : "No"}</td>
+                            <td data-label="Acción">
                               {installment.paidAt ? (
                                 <span className="muted">Sin acción</span>
                               ) : (
@@ -1124,7 +1124,7 @@ function App() {
               </form>
 
               <div className="table-wrap">
-                <table>
+                <table className="card-table">
                   <thead>
                     <tr>
                       <th>Nombre</th>
@@ -1136,12 +1136,14 @@ function App() {
                   <tbody>
                     {debtors.length === 0 ? (
                       <tr>
-                        <td colSpan={4}>No hay deudores registrados.</td>
+                        <td className="table-empty" colSpan={4}>
+                          No hay deudores registrados.
+                        </td>
                       </tr>
                     ) : (
                       debtors.map((debtor) => (
                         <tr key={debtor.id}>
-                          <td>
+                          <td data-label="Nombre">
                             <button
                               type="button"
                               className="link-btn"
@@ -1150,9 +1152,9 @@ function App() {
                               {debtor.name}
                             </button>
                           </td>
-                          <td>{debtor.email}</td>
-                          <td>{formatCurrency(debtor.totalDebt)}</td>
-                          <td className="mono">{debtor.id}</td>
+                          <td data-label="Email">{debtor.email}</td>
+                          <td data-label="Deuda pendiente">{formatCurrency(debtor.totalDebt)}</td>
+                          <td data-label="ID" className="mono">{debtor.id}</td>
                         </tr>
                       ))
                     )}
@@ -1280,7 +1282,7 @@ function App() {
                 {unpaidByMonthLoading ? <p className="muted">Consultando cuotas impagas...</p> : null}
 
                 <div className="table-wrap">
-                  <table>
+                  <table className="card-table">
                     <thead>
                       <tr>
                         <th>Vencimiento</th>
@@ -1295,19 +1297,21 @@ function App() {
                     <tbody>
                       {!unpaidByMonthResult || unpaidByMonthResult.installments.length === 0 ? (
                         <tr>
-                          <td colSpan={7}>No hay cuotas para este filtro.</td>
+                          <td className="table-empty" colSpan={7}>
+                            No hay cuotas para este filtro.
+                          </td>
                         </tr>
                       ) : (
                         unpaidByMonthResult.installments.map((item) => (
                           <tr key={item.installmentId}>
-                            <td>{formatDate(item.dueDate)}</td>
-                            <td>{formatCurrency(item.amount)}</td>
-                            <td>
+                            <td data-label="Vencimiento">{formatDate(item.dueDate)}</td>
+                            <td data-label="Monto">{formatCurrency(item.amount)}</td>
+                            <td data-label="Estado">
                               <span className={item.paid ? "badge success" : "badge warning"}>
                                 {item.paid ? "Pagada" : "Pendiente"}
                               </span>
                             </td>
-                            <td>
+                            <td data-label="Pertenece a">
                               <button
                                 type="button"
                                 className="link-btn"
@@ -1316,11 +1320,11 @@ function App() {
                                 {item.debtDescription}
                               </button>
                             </td>
-                            <td>
+                            <td data-label="Cuota">
                               {item.installmentNumber}/{item.totalInstallments}
                             </td>
-                            <td>{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
-                            <td>
+                            <td data-label="Sueldo">{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
+                            <td data-label="Acción">
                               {item.paid ? (
                                 <span className="muted">Sin acción</span>
                               ) : (
@@ -1462,7 +1466,7 @@ function App() {
 
                 {monthlyFreeAmountResult ? (
                   <div className="table-wrap">
-                    <table>
+                    <table className="card-table">
                       <thead>
                         <tr>
                           <th>Mes</th>
@@ -1473,9 +1477,11 @@ function App() {
                       <tbody>
                         {monthlyFreeAmountResult.months.map((item) => (
                           <tr key={`${item.year}-${item.month}`}>
-                            <td>{MONTH_OPTIONS.find((month) => month.value === item.month)?.label ?? item.month}</td>
-                            <td>{item.year}</td>
-                            <td>{formatCurrency(item.freeAmount)}</td>
+                            <td data-label="Mes">
+                              {MONTH_OPTIONS.find((month) => month.value === item.month)?.label ?? item.month}
+                            </td>
+                            <td data-label="Año">{item.year}</td>
+                            <td data-label="Monto libre">{formatCurrency(item.freeAmount)}</td>
                           </tr>
                         ))}
                       </tbody>
