@@ -31,6 +31,19 @@ type PendingDebtDelete = {
   debtDescription: string;
 } | null;
 
+type PendingInstallmentPayment = {
+  installmentId: string;
+  amount: string;
+  dueDate: string | null;
+} | null;
+
+type PendingSalaryPayment = {
+  debtorName: string;
+  year: number;
+  month: number;
+  amount: string;
+} | null;
+
 type DebtDetailModalState = {
   debtorId: string;
   debtorName: string;
@@ -185,6 +198,8 @@ function App() {
   const [recurringTotals, setRecurringTotals] = useState<RecurringTotals>(EMPTY_TOTALS);
   const [pendingRecurringDelete, setPendingRecurringDelete] = useState<PendingRecurringDelete>(null);
   const [pendingDebtDelete, setPendingDebtDelete] = useState<PendingDebtDelete>(null);
+  const [pendingInstallmentPayment, setPendingInstallmentPayment] = useState<PendingInstallmentPayment>(null);
+  const [pendingSalaryPayment, setPendingSalaryPayment] = useState<PendingSalaryPayment>(null);
   const [unpaidByMonthLoading, setUnpaidByMonthLoading] = useState(false);
   const [unpaidByMonthResult, setUnpaidByMonthResult] = useState<GetUnpaidInstallmentsByMonthResponse | null>(null);
   const [debtDetailModal, setDebtDetailModal] = useState<DebtDetailModalState>(null);
@@ -507,7 +522,7 @@ function App() {
     }
   }
 
-  async function handlePayInstallment(installmentId: string) {
+  async function executePayInstallment(installmentId: string) {
     setNotice(null);
     try {
       await api.payInstallment(installmentId, { paymentDate: new Date().toISOString() });
@@ -524,6 +539,21 @@ function App() {
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
+  }
+
+  function requestPayInstallment(installmentId: string, amount: string | number, dueDate: string | null) {
+    setPendingInstallmentPayment({
+      installmentId,
+      amount: String(amount),
+      dueDate
+    });
+  }
+
+  async function confirmPayInstallment() {
+    if (!pendingInstallmentPayment) return;
+    const target = pendingInstallmentPayment;
+    setPendingInstallmentPayment(null);
+    await executePayInstallment(target.installmentId);
   }
 
   async function confirmDeleteDebt() {
@@ -590,7 +620,7 @@ function App() {
     }
   }
 
-  async function handlePayMonthlySalary() {
+  async function executePayMonthlySalary() {
     if (!debtorMonthlyQuery.debtorId) return;
     setSalaryPaying(true);
     setNotice(null);
@@ -608,6 +638,24 @@ function App() {
     } finally {
       setSalaryPaying(false);
     }
+  }
+
+  function requestPayMonthlySalary() {
+    if (!debtorMonthlyQuery.debtorId) return;
+    const selectedDebtor = debtors.find((debtor) => debtor.id === debtorMonthlyQuery.debtorId);
+    const debtorName = selectedDebtor?.name ?? unpaidByMonthResult?.debtorName ?? debtorMonthlyQuery.debtorId;
+    setPendingSalaryPayment({
+      debtorName,
+      year: debtorMonthlyQuery.year,
+      month: debtorMonthlyQuery.month,
+      amount: formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)
+    });
+  }
+
+  async function confirmPayMonthlySalary() {
+    if (!pendingSalaryPayment) return;
+    setPendingSalaryPayment(null);
+    await executePayMonthlySalary();
   }
 
   async function handleDownloadMonthlyPdf() {
@@ -860,6 +908,63 @@ function App() {
         </div>
       ) : null}
 
+      {pendingInstallmentPayment ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingInstallmentPayment(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pay-installment-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="pay-installment-title">Confirmar pago de cuota</h3>
+            <p>
+              Monto: <strong>{formatCurrency(pendingInstallmentPayment.amount)}</strong>
+            </p>
+            <p>Vencimiento: {formatDate(pendingInstallmentPayment.dueDate)}</p>
+            <div className="form-actions split">
+              <button type="button" onClick={() => void confirmPayInstallment()}>
+                Sí, pagar cuota
+              </button>
+              <button type="button" className="secondary" onClick={() => setPendingInstallmentPayment(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingSalaryPayment ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingSalaryPayment(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pay-salary-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="pay-salary-title">Confirmar pago de sueldo</h3>
+            <p>
+              Deudor: <strong>{pendingSalaryPayment.debtorName}</strong>
+            </p>
+            <p>
+              Periodo: {getMonthLabel(pendingSalaryPayment.month)} {pendingSalaryPayment.year}
+            </p>
+            <p>
+              Monto: <strong>{pendingSalaryPayment.amount}</strong>
+            </p>
+            <div className="form-actions split">
+              <button type="button" onClick={() => void confirmPayMonthlySalary()}>
+                Sí, pagar sueldo
+              </button>
+              <button type="button" className="secondary" onClick={() => setPendingSalaryPayment(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {debtDetailModal ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setDebtDetailModal(null)}>
           <div
@@ -934,7 +1039,9 @@ function App() {
                                 <button
                                   type="button"
                                   className="secondary"
-                                  onClick={() => void handlePayInstallment(installment.id)}
+                                  onClick={() =>
+                                    requestPayInstallment(installment.id, installment.amount, installment.dueDate)
+                                  }
                                 >
                                   Pagar ahora
                                 </button>
@@ -1154,7 +1261,7 @@ function App() {
                   <div className="form-actions split" style={{ marginTop: "0.6rem" }}>
                     <button
                       type="button"
-                      onClick={() => void handlePayMonthlySalary()}
+                      onClick={requestPayMonthlySalary}
                       disabled={salaryPaying || salarySnapshotLoading}
                     >
                       {salaryPaying ? "Pagando..." : "Pagar sueldo"}
@@ -1220,7 +1327,7 @@ function App() {
                                 <button
                                   type="button"
                                   className="secondary"
-                                  onClick={() => void handlePayInstallment(item.installmentId)}
+                                  onClick={() => requestPayInstallment(item.installmentId, item.amount, item.dueDate)}
                                 >
                                   Pagar
                                 </button>
