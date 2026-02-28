@@ -155,6 +155,7 @@ export type LoginResponse = {
   email: string;
   role: UserRole;
   debtorId: string | null;
+  mustChangePassword: boolean;
 };
 
 export type DebtorAccessResponse = {

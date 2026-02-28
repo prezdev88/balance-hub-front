@@ -115,6 +115,12 @@ export const api = {
       method: "POST"
     });
   },
+  changePassword(payload: { newPassword: string }) {
+    return request<void>("/api/auth/change-password", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
   listDebtors() {
     return request<ListDebtorsResponse>("/api/debtors");
   },

@@ -228,6 +228,11 @@ function App() {
   const [notice, setNotice] = useState<AppNotice>(null);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [loginLoading, setLoginLoading] = useState(false);
+  const [passwordChangeForm, setPasswordChangeForm] = useState({
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
 
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringState>(EMPTY_RECURRING);
@@ -312,6 +317,10 @@ function App() {
 
   useEffect(() => {
     if (!session) {
+      setBootLoading(false);
+      return;
+    }
+    if (session.mustChangePassword) {
       setBootLoading(false);
       return;
     }
@@ -487,7 +496,36 @@ function App() {
       setPendingDebtorAccessAction(null);
       setDebtorAccessResult(null);
       setDebtorAccessPassword("");
+      setPasswordChangeForm({ newPassword: "", confirmPassword: "" });
       setNotice({ type: "success", text: "Sesión cerrada." });
+    }
+  }
+
+  async function handleChangeOwnPassword(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+
+    const newPassword = passwordChangeForm.newPassword.trim();
+    const confirmPassword = passwordChangeForm.confirmPassword.trim();
+    if (newPassword.length < 6) {
+      setNotice({ type: "error", text: "La nueva contraseña debe tener al menos 6 caracteres." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setNotice({ type: "error", text: "La confirmación de contraseña no coincide." });
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    try {
+      await api.changePassword({ newPassword });
+      setSession((current) => (current ? { ...current, mustChangePassword: false } : current));
+      setPasswordChangeForm({ newPassword: "", confirmPassword: "" });
+      setNotice({ type: "success", text: "Contraseña actualizada. Ya puedes usar el sistema." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    } finally {
+      setPasswordChangeLoading(false);
     }
   }
 
@@ -505,12 +543,16 @@ function App() {
       setDebtorAccessPassword("");
       setPendingDebtorAccessAction(null);
       await reloadDebtors();
+      const actionText =
+        pendingDebtorAccessAction.action === "grant"
+          ? "Acceso de deudor otorgado."
+          : "Contraseña de deudor actualizada.";
+      const passwordText = response.password
+        ? ` Clave: ${response.password}${response.passwordGenerated ? " (generada)." : "."}`
+        : "";
       setNotice({
         type: "success",
-        text:
-          pendingDebtorAccessAction.action === "grant"
-            ? "Acceso de deudor otorgado."
-            : "Contraseña de deudor actualizada."
+        text: `${actionText}${passwordText}`
       });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -985,7 +1027,7 @@ function App() {
         </div>
       </header>
 
-      {!session ? null : (
+      {!session || session.mustChangePassword ? null : (
         <nav className="tabs" aria-label="Secciones">
           {availableTabs.map((tab) => (
             <button
@@ -1019,7 +1061,7 @@ function App() {
                 <input
                   value={loginForm.email}
                   onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
-                  placeholder="admin o correo"
+                  placeholder="Usuario"
                   autoComplete="username"
                   required
                 />
@@ -1037,6 +1079,48 @@ function App() {
               <div className="form-actions">
                 <button type="submit" disabled={loginLoading}>
                   {loginLoading ? "Ingresando..." : "Ingresar"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </main>
+      ) : null}
+
+      {session?.mustChangePassword ? (
+        <main className="grid">
+          <section className="panel auth-panel">
+            <div className="panel-header">
+              <h2>Cambio de contraseña obligatorio</h2>
+              <p>Por seguridad, debes crear una nueva contraseña antes de continuar.</p>
+            </div>
+            <form className="form-grid auth-form" onSubmit={handleChangeOwnPassword}>
+              <label>
+                Nueva contraseña
+                <input
+                  type="password"
+                  value={passwordChangeForm.newPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm((current) => ({ ...current, newPassword: event.target.value }))
+                  }
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <label>
+                Confirmar contraseña
+                <input
+                  type="password"
+                  value={passwordChangeForm.confirmPassword}
+                  onChange={(event) =>
+                    setPasswordChangeForm((current) => ({ ...current, confirmPassword: event.target.value }))
+                  }
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <div className="form-actions">
+                <button type="submit" disabled={passwordChangeLoading}>
+                  {passwordChangeLoading ? "Actualizando..." : "Cambiar contraseña"}
                 </button>
               </div>
             </form>
@@ -1372,7 +1456,7 @@ function App() {
 
       {bootLoading ? <div className="panel">Cargando datos iniciales...</div> : null}
 
-      {!bootLoading && session && (
+      {!bootLoading && session && !session.mustChangePassword && (
         <main className="grid">
           {activeTab === "debtors" && (
             <Section title="Deudores" description="Crea y visualiza deudores disponibles para asociar deudas.">
