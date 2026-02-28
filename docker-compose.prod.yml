@@ -1,0 +1,20 @@
+services:
+  balance-hub-front:
+    container_name: balance-hub-front
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: balance-hub-front:prod
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    networks:
+      - balance-hub-front-net
+      - balance-hub-net
+
+networks:
+  balance-hub-front-net:
+    name: balance-hub-front-net
+  balance-hub-net:
+    external: true
+    name: balance-hub-net
