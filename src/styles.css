@@ -50,6 +50,12 @@ select {
   gap: 0.7rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .theme-toggle {
   white-space: nowrap;
 }
@@ -65,6 +71,15 @@ select {
 .subtitle {
   margin: 0.7rem 0 0;
   opacity: 0.9;
+}
+
+.auth-panel {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.auth-form {
+  max-width: 420px;
 }
 
 .tabs {
@@ -556,6 +571,12 @@ th {
   .header-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 

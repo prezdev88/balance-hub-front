@@ -2,6 +2,8 @@ import { startTransition, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiClientError, api } from "./lib/api";
 import type {
+  DebtorAccessResponse,
+  LoginResponse,
   GetMonthlyFreeAmountResponse,
   Debt,
   Debtor,
@@ -14,6 +16,7 @@ import type {
 
 type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary";
 type ThemeMode = "light" | "dark";
+type SessionState = LoginResponse | null;
 
 type AppNotice = {
   type: "success" | "error";
@@ -44,6 +47,12 @@ type PendingSalaryPayment = {
   amount: string;
 } | null;
 
+type PendingDebtorAccessAction = {
+  debtorId: string;
+  debtorName: string;
+  action: "grant" | "resetPassword";
+} | null;
+
 type DebtDetailModalState = {
   debtorId: string;
   debtorName: string;
@@ -67,13 +76,6 @@ type RecurringTotals = {
   OPTIONAL: string;
 };
 
-const TAB_OPTIONS: Array<{ key: TabKey; label: string }> = [
-  { key: "debtors", label: "Deudores" },
-  { key: "debtorProfile", label: "Perfil deudor" },
-  { key: "recurring", label: "Gastos recurrentes" },
-  { key: "salary", label: "Sueldos" }
-];
-
 const EMPTY_RECURRING: RecurringState = { FIXED: [], OPTIONAL: [] };
 const EMPTY_TOTALS: RecurringTotals = { FIXED: "0", OPTIONAL: "0" };
 const MONTH_OPTIONS = [
@@ -91,6 +93,14 @@ const MONTH_OPTIONS = [
   { value: 12, label: "Diciembre" }
 ];
 const DEBT_DETAIL_PAGE_SIZE = 5;
+const SESSION_STORAGE_KEY = "balance-hub-session-v1";
+const ADMIN_TABS: Array<{ key: TabKey; label: string }> = [
+  { key: "debtors", label: "Deudores" },
+  { key: "debtorProfile", label: "Perfil deudor" },
+  { key: "recurring", label: "Gastos recurrentes" },
+  { key: "salary", label: "Sueldos" }
+];
+const DEBTOR_TABS: Array<{ key: TabKey; label: string }> = [{ key: "debtorProfile", label: "Mi perfil" }];
 
 function getTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -162,6 +172,27 @@ function getMonthLabel(month: number): string {
   return MONTH_OPTIONS.find((item) => item.value === month)?.label.toLowerCase() ?? String(month);
 }
 
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function readStoredSession(): SessionState {
+  if (typeof window === "undefined") return null;
+
+  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as LoginResponse;
+    if (!parsed.accessToken || !parsed.role || !parsed.email) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function Section({
   title,
   description,
@@ -183,15 +214,20 @@ function Section({
 }
 
 function App() {
+  const [session, setSession] = useState<SessionState>(() => readStoredSession());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "light";
     const saved = window.localStorage.getItem("balance-hub-theme");
     if (saved === "light" || saved === "dark") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
-  const [activeTab, setActiveTab] = useState<TabKey>("debtors");
-  const [bootLoading, setBootLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>(() =>
+    readStoredSession()?.role === "DEBTOR" ? "debtorProfile" : "debtors"
+  );
+  const [bootLoading, setBootLoading] = useState(Boolean(readStoredSession()));
   const [notice, setNotice] = useState<AppNotice>(null);
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringState>(EMPTY_RECURRING);
@@ -200,6 +236,9 @@ function App() {
   const [pendingDebtDelete, setPendingDebtDelete] = useState<PendingDebtDelete>(null);
   const [pendingInstallmentPayment, setPendingInstallmentPayment] = useState<PendingInstallmentPayment>(null);
   const [pendingSalaryPayment, setPendingSalaryPayment] = useState<PendingSalaryPayment>(null);
+  const [pendingDebtorAccessAction, setPendingDebtorAccessAction] = useState<PendingDebtorAccessAction>(null);
+  const [debtorAccessPassword, setDebtorAccessPassword] = useState("");
+  const [debtorAccessResult, setDebtorAccessResult] = useState<DebtorAccessResponse | null>(null);
   const [unpaidByMonthLoading, setUnpaidByMonthLoading] = useState(false);
   const [unpaidByMonthResult, setUnpaidByMonthResult] = useState<GetUnpaidInstallmentsByMonthResponse | null>(null);
   const [debtDetailModal, setDebtDetailModal] = useState<DebtDetailModalState>(null);
@@ -257,56 +296,106 @@ function App() {
     year: getCurrentYear()
   });
 
+  const isAdmin = session?.role === "ADMIN";
+  const isDebtor = session?.role === "DEBTOR";
+  const availableTabs = isDebtor ? DEBTOR_TABS : ADMIN_TABS;
+
   useEffect(() => {
-    void loadInitialData();
-  }, []);
+    api.setAuthToken(session?.accessToken ?? null);
+    if (typeof window === "undefined") return;
+    if (session) {
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    } else {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      setBootLoading(false);
+      return;
+    }
+    void loadInitialData(session);
+  }, [session]);
+
+  useEffect(() => {
+    if (!availableTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(availableTabs[0].key);
+    }
+  }, [activeTab, availableTabs]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", themeMode);
     window.localStorage.setItem("balance-hub-theme", themeMode);
   }, [themeMode]);
 
-  async function loadInitialData() {
+  async function loadInitialData(currentSession: LoginResponse) {
     setBootLoading(true);
     try {
-      // Vercel rule async-parallel: fetch independent resources concurrently.
-      const [
-        debtorsResponse,
-        fixedList,
-        optionalList,
-        fixedTotal,
-        optionalTotal
-      ] = await Promise.all([
-        api.listDebtors(),
-        api.listRecurringExpenses("FIXED"),
-        api.listRecurringExpenses("OPTIONAL"),
-        api.getRecurringExpenseTotal("FIXED"),
-        api.getRecurringExpenseTotal("OPTIONAL")
-      ]);
+      if (currentSession.role === "ADMIN") {
+        // Vercel rule async-parallel: fetch independent resources concurrently.
+        const [
+          debtorsResponse,
+          fixedList,
+          optionalList,
+          fixedTotal,
+          optionalTotal
+        ] = await Promise.all([
+          api.listDebtors(),
+          api.listRecurringExpenses("FIXED"),
+          api.listRecurringExpenses("OPTIONAL"),
+          api.getRecurringExpenseTotal("FIXED"),
+          api.getRecurringExpenseTotal("OPTIONAL")
+        ]);
 
-      setDebtors(debtorsResponse.debtors);
-      setRecurringExpenses({
-        FIXED: fixedList.recurringExpenses,
-        OPTIONAL: optionalList.recurringExpenses
-      });
-      setRecurringTotals({
-        FIXED: fixedTotal.total,
-        OPTIONAL: optionalTotal.total
-      });
+        setDebtors(debtorsResponse.debtors);
+        setRecurringExpenses({
+          FIXED: fixedList.recurringExpenses,
+          OPTIONAL: optionalList.recurringExpenses
+        });
+        setRecurringTotals({
+          FIXED: fixedTotal.total,
+          OPTIONAL: optionalTotal.total
+        });
 
-      setDebtForm((current) => ({
-        ...current,
-        debtorId: current.debtorId || debtorsResponse.debtors[0]?.id || ""
-      }));
-      setDebtorMonthlyQuery((current) => ({
-        ...current,
-        debtorId: current.debtorId || debtorsResponse.debtors[0]?.id || ""
-      }));
-      startTransition(() => {
-        void loadMonthlyFreeAmount(getCurrentYear(), true);
-      });
+        setDebtForm((current) => ({
+          ...current,
+          debtorId: current.debtorId || debtorsResponse.debtors[0]?.id || ""
+        }));
+        setDebtorMonthlyQuery((current) => ({
+          ...current,
+          debtorId: current.debtorId || debtorsResponse.debtors[0]?.id || ""
+        }));
+        startTransition(() => {
+          void loadMonthlyFreeAmount(getCurrentYear(), true);
+        });
+      } else {
+        const debtorId = currentSession.debtorId ?? "";
+        if (!debtorId) {
+          throw new Error("La sesión de deudor no tiene debtorId.");
+        }
+        setDebtors([
+          {
+            id: debtorId,
+            name: currentSession.email,
+            email: currentSession.email,
+            totalDebt: "0",
+            accessEnabled: true
+          }
+        ]);
+        setDebtorMonthlyQuery((current) => ({
+          ...current,
+          debtorId
+        }));
+        await loadDebtorMonthData(debtorId, getCurrentYear(), getCurrentMonth(), true);
+      }
     } catch (error) {
-      setNotice({ type: "error", text: toErrorMessage(error) });
+      if (error instanceof ApiClientError && error.status === 401) {
+        setNotice({ type: "error", text: "Sesión expirada. Inicia sesión nuevamente." });
+        setSession(null);
+      } else {
+        setNotice({ type: "error", text: toErrorMessage(error) });
+      }
     } finally {
       setBootLoading(false);
     }
@@ -357,6 +446,88 @@ function App() {
 
     setRecurringExpenses((current) => ({ ...current, [type]: listResponse.recurringExpenses }));
     setRecurringTotals((current) => ({ ...current, [type]: totalResponse.total }));
+  }
+
+  async function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+    setLoginLoading(true);
+    try {
+      const result = await api.login({
+        email: normalizeEmail(loginForm.email),
+        password: loginForm.password
+      });
+      setSession(result);
+      setLoginForm({ email: "", password: "" });
+      setActiveTab(result.role === "ADMIN" ? "debtors" : "debtorProfile");
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setNotice(null);
+    try {
+      await api.logout();
+    } catch {
+      // Logout should continue locally even if remote request fails.
+    } finally {
+      setSession(null);
+      setDebtors([]);
+      setRecurringExpenses(EMPTY_RECURRING);
+      setRecurringTotals(EMPTY_TOTALS);
+      setMonthlyFreeAmountResult(null);
+      setUnpaidByMonthResult(null);
+      setSalarySnapshot(null);
+      setSalaryPreviewAmount("0");
+      setDebtDetailModal(null);
+      setDebtDetail(null);
+      setPendingDebtorAccessAction(null);
+      setDebtorAccessResult(null);
+      setDebtorAccessPassword("");
+      setNotice({ type: "success", text: "Sesión cerrada." });
+    }
+  }
+
+  async function confirmDebtorAccessAction() {
+    if (!pendingDebtorAccessAction) return;
+    setNotice(null);
+    setDebtorAccessResult(null);
+    try {
+      const payload = debtorAccessPassword.trim() ? { password: debtorAccessPassword.trim() } : undefined;
+      const response =
+        pendingDebtorAccessAction.action === "grant"
+          ? await api.grantDebtorAccess(pendingDebtorAccessAction.debtorId, payload)
+          : await api.resetDebtorPassword(pendingDebtorAccessAction.debtorId, payload);
+      setDebtorAccessResult(response);
+      setDebtorAccessPassword("");
+      setPendingDebtorAccessAction(null);
+      await reloadDebtors();
+      setNotice({
+        type: "success",
+        text:
+          pendingDebtorAccessAction.action === "grant"
+            ? "Acceso de deudor otorgado."
+            : "Contraseña de deudor actualizada."
+      });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function revokeDebtorAccess(debtorId: string) {
+    setNotice(null);
+    setDebtorAccessResult(null);
+    try {
+      const response = await api.revokeDebtorAccess(debtorId);
+      setDebtorAccessResult(response);
+      await reloadDebtors();
+      setNotice({ type: "success", text: "Acceso de deudor revocado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
   }
 
   async function handleCreateDebtor(event: React.FormEvent) {
@@ -523,6 +694,7 @@ function App() {
   }
 
   async function executePayInstallment(installmentId: string) {
+    if (!isAdmin) return;
     setNotice(null);
     try {
       await api.payInstallment(installmentId, { paymentDate: new Date().toISOString() });
@@ -542,6 +714,7 @@ function App() {
   }
 
   function requestPayInstallment(installmentId: string, amount: string | number, dueDate: string | null) {
+    if (!isAdmin) return;
     setPendingInstallmentPayment({
       installmentId,
       amount: String(amount),
@@ -578,10 +751,15 @@ function App() {
       return;
     }
 
-    await loadDebtorMonthData(debtorMonthlyQuery.debtorId, debtorMonthlyQuery.year, debtorMonthlyQuery.month);
+    await loadDebtorMonthData(
+      debtorMonthlyQuery.debtorId,
+      debtorMonthlyQuery.year,
+      debtorMonthlyQuery.month,
+      isDebtor
+    );
   }
 
-  async function loadDebtorMonthData(debtorId: string, year: number, month: number) {
+  async function loadDebtorMonthData(debtorId: string, year: number, month: number, debtorMode = false) {
     if (!debtorId) return;
 
     setUnpaidByMonthLoading(true);
@@ -591,10 +769,14 @@ function App() {
     try {
       const result = await api.getUnpaidInstallmentsByMonth({ debtorId, year, month });
       setUnpaidByMonthResult(result);
-      const monthlyFreeAmount = await api.getMonthlyFreeAmount(year);
-      const totalInstallments = result.installments.reduce((sum, item) => sum + Number(item.amount), 0);
-      const preview = Number(monthlyFreeAmount.monthlyFreeAmount) / 2 - totalInstallments;
-      setSalaryPreviewAmount(String(preview));
+      if (debtorMode) {
+        setSalaryPreviewAmount("0");
+      } else {
+        const monthlyFreeAmount = await api.getMonthlyFreeAmount(year);
+        const totalInstallments = result.installments.reduce((sum, item) => sum + Number(item.amount), 0);
+        const preview = Number(monthlyFreeAmount.monthlyFreeAmount) / 2 - totalInstallments;
+        setSalaryPreviewAmount(String(preview));
+      }
       setSalarySnapshotLoading(true);
       try {
         const snapshot = await api.getSalarySnapshot({
@@ -621,6 +803,7 @@ function App() {
   }
 
   async function executePayMonthlySalary() {
+    if (!isAdmin) return;
     if (!debtorMonthlyQuery.debtorId) return;
     setSalaryPaying(true);
     setNotice(null);
@@ -644,6 +827,7 @@ function App() {
     if (!debtorMonthlyQuery.debtorId) return;
     const selectedDebtor = debtors.find((debtor) => debtor.id === debtorMonthlyQuery.debtorId);
     const debtorName = selectedDebtor?.name ?? unpaidByMonthResult?.debtorName ?? debtorMonthlyQuery.debtorId;
+    if (!isAdmin) return;
     setPendingSalaryPayment({
       debtorName,
       year: debtorMonthlyQuery.year,
@@ -709,6 +893,7 @@ function App() {
   }
 
   function openDebtorProfile(debtorId: string) {
+    if (!isAdmin) return;
     const query = {
       debtorId,
       month: debtorMonthlyQuery.month,
@@ -720,7 +905,7 @@ function App() {
     }));
     setActiveTab("debtorProfile");
     startTransition(() => {
-      void loadDebtorMonthData(query.debtorId, query.year, query.month);
+      void loadDebtorMonthData(query.debtorId, query.year, query.month, false);
     });
   }
 
@@ -735,6 +920,7 @@ function App() {
   }
 
   function openDebtsFromDebtorProfile() {
+    if (!isAdmin) return;
     if (!debtorMonthlyQuery.debtorId) return;
     const selectedDebtor =
       debtors.find((debtor) => debtor.id === debtorMonthlyQuery.debtorId) ??
@@ -743,7 +929,8 @@ function App() {
             id: unpaidByMonthResult.debtorId,
             name: unpaidByMonthResult.debtorName,
             email: unpaidByMonthResult.debtorEmail,
-            totalDebt: "0"
+            totalDebt: "0",
+            accessEnabled: true
           }
         : null);
 
@@ -775,29 +962,43 @@ function App() {
         <div>
           <div className="header-top">
             <h1>Balance Hub</h1>
-            <button
-              type="button"
-              className="secondary theme-toggle"
-              onClick={() => setThemeMode((current) => (current === "dark" ? "light" : "dark"))}
-            >
-              {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
-            </button>
+            <div className="header-actions">
+              {session ? (
+                <button type="button" className="secondary" onClick={() => void handleLogout()}>
+                  Cerrar sesión
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="secondary theme-toggle"
+                onClick={() => setThemeMode((current) => (current === "dark" ? "light" : "dark"))}
+              >
+                {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
+              </button>
+            </div>
           </div>
+          {session ? (
+            <p className="subtitle">
+              Sesión: <strong>{session.email}</strong> ({session.role === "ADMIN" ? "Administrador" : "Deudor"})
+            </p>
+          ) : null}
         </div>
       </header>
 
-      <nav className="tabs" aria-label="Secciones">
-        {TAB_OPTIONS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={tab.key === activeTab ? "tab active" : "tab"}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {!session ? null : (
+        <nav className="tabs" aria-label="Secciones">
+          {availableTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={tab.key === activeTab ? "tab active" : "tab"}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {notice ? (
         <div className={notice.type === "error" ? "notice error" : "notice success"} role="status">
@@ -805,7 +1006,82 @@ function App() {
         </div>
       ) : null}
 
-      {recurringEditing ? (
+      {!session ? (
+        <main className="grid">
+          <section className="panel auth-panel">
+            <div className="panel-header">
+              <h2>Iniciar sesión</h2>
+              <p>Accede con tu usuario y contraseña para entrar al sistema.</p>
+            </div>
+            <form className="form-grid auth-form" onSubmit={handleLogin}>
+              <label>
+                Usuario o email
+                <input
+                  value={loginForm.email}
+                  onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
+                  placeholder="admin o correo"
+                  autoComplete="username"
+                  required
+                />
+              </label>
+              <label>
+                Contraseña
+                <input
+                  type="password"
+                  value={loginForm.password}
+                  onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <div className="form-actions">
+                <button type="submit" disabled={loginLoading}>
+                  {loginLoading ? "Ingresando..." : "Ingresar"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </main>
+      ) : null}
+
+      {pendingDebtorAccessAction ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingDebtorAccessAction(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="debtor-access-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="debtor-access-title">
+              {pendingDebtorAccessAction.action === "grant" ? "Otorgar acceso" : "Reiniciar contraseña"}
+            </h3>
+            <p>
+              Deudor: <strong>{pendingDebtorAccessAction.debtorName}</strong>
+            </p>
+            <div className="form-grid" style={{ marginBottom: 0 }}>
+              <label>
+                Contraseña (opcional)
+                <input
+                  value={debtorAccessPassword}
+                  onChange={(event) => setDebtorAccessPassword(event.target.value)}
+                  placeholder="Vacío = generar automáticamente"
+                />
+              </label>
+            </div>
+            <div className="form-actions split" style={{ marginTop: "0.8rem" }}>
+              <button type="button" onClick={() => void confirmDebtorAccessAction()}>
+                Confirmar
+              </button>
+              <button type="button" className="secondary" onClick={() => setPendingDebtorAccessAction(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {!session ? null : recurringEditing ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setRecurringEditing(null)}>
           <div
             className="modal"
@@ -995,19 +1271,21 @@ function App() {
                       <span className={debtDetail.settled ? "badge success" : "badge warning"}>
                         {debtDetail.settled ? "Saldada" : "Pendiente"}
                       </span>
-                      <button
-                        type="button"
-                        className="danger"
-                        onClick={() => {
-                          setDebtDetailModal(null);
-                          setPendingDebtDelete({
-                            debtId: debtDetail.id,
-                            debtDescription: debtDetail.description
-                          });
-                        }}
-                      >
-                        Eliminar deuda
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          className="danger"
+                          onClick={() => {
+                            setDebtDetailModal(null);
+                            setPendingDebtDelete({
+                              debtId: debtDetail.id,
+                              debtDescription: debtDetail.description
+                            });
+                          }}
+                        >
+                          Eliminar deuda
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <p className="muted">
@@ -1033,7 +1311,7 @@ function App() {
                             <td data-label="Monto">{formatCurrency(installment.amount)}</td>
                             <td data-label="Pagada">{installment.paidAt ? formatDate(installment.paidAt) : "No"}</td>
                             <td data-label="Acción">
-                              {installment.paidAt ? (
+                              {installment.paidAt || !isAdmin ? (
                                 <span className="muted">Sin acción</span>
                               ) : (
                                 <button
@@ -1094,7 +1372,7 @@ function App() {
 
       {bootLoading ? <div className="panel">Cargando datos iniciales...</div> : null}
 
-      {!bootLoading && (
+      {!bootLoading && session && (
         <main className="grid">
           {activeTab === "debtors" && (
             <Section title="Deudores" description="Crea y visualiza deudores disponibles para asociar deudas.">
@@ -1123,6 +1401,23 @@ function App() {
                 </div>
               </form>
 
+              {debtorAccessResult ? (
+                <div className="info-card">
+                  <p>
+                    <strong>Acceso:</strong> {debtorAccessResult.enabled ? "Habilitado" : "Revocado"}
+                  </p>
+                  <p>
+                    <strong>Email:</strong> {debtorAccessResult.email}
+                  </p>
+                  {debtorAccessResult.password ? (
+                    <p>
+                      <strong>Contraseña:</strong> {debtorAccessResult.password}{" "}
+                      {debtorAccessResult.passwordGenerated ? "(generada)" : "(manual)"}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="table-wrap">
                 <table className="card-table">
                   <thead>
@@ -1131,12 +1426,14 @@ function App() {
                       <th>Email</th>
                       <th>Deuda pendiente</th>
                       <th>ID</th>
+                      <th>Inicio sesión</th>
+                      <th>Acceso</th>
                     </tr>
                   </thead>
                   <tbody>
                     {debtors.length === 0 ? (
                       <tr>
-                        <td className="table-empty" colSpan={4}>
+                        <td className="table-empty" colSpan={6}>
                           No hay deudores registrados.
                         </td>
                       </tr>
@@ -1155,6 +1452,48 @@ function App() {
                           <td data-label="Email">{debtor.email}</td>
                           <td data-label="Deuda pendiente">{formatCurrency(debtor.totalDebt)}</td>
                           <td data-label="ID" className="mono">{debtor.id}</td>
+                          <td data-label="Inicio sesión">
+                            <span className={debtor.accessEnabled ? "badge success" : "badge warning"}>
+                              {debtor.accessEnabled ? "Habilitado" : "Revocado"}
+                            </span>
+                          </td>
+                          <td data-label="Acceso">
+                            <div className="item-actions">
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={() =>
+                                  setPendingDebtorAccessAction({
+                                    debtorId: debtor.id,
+                                    debtorName: debtor.name,
+                                    action: "grant"
+                                  })
+                                }
+                              >
+                                Otorgar
+                              </button>
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={() =>
+                                  setPendingDebtorAccessAction({
+                                    debtorId: debtor.id,
+                                    debtorName: debtor.name,
+                                    action: "resetPassword"
+                                  })
+                                }
+                              >
+                                Clave
+                              </button>
+                              <button
+                                type="button"
+                                className="danger"
+                                onClick={() => void revokeDebtorAccess(debtor.id)}
+                              >
+                                Revocar
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -1174,25 +1513,32 @@ function App() {
                     void runUnpaidByMonthQuery();
                   }}
                 >
-                  <label>
-                    Deudor
-                    <select
-                      value={debtorMonthlyQuery.debtorId}
-                      onChange={(event) =>
-                        setDebtorMonthlyQuery((current) => ({ ...current, debtorId: event.target.value }))
-                      }
-                      required
-                    >
-                      <option value="" disabled>
-                        Selecciona un deudor
-                      </option>
-                      {debtors.map((debtor) => (
-                        <option key={debtor.id} value={debtor.id}>
-                          {debtor.name} ({debtor.email})
+                  {isAdmin ? (
+                    <label>
+                      Deudor
+                      <select
+                        value={debtorMonthlyQuery.debtorId}
+                        onChange={(event) =>
+                          setDebtorMonthlyQuery((current) => ({ ...current, debtorId: event.target.value }))
+                        }
+                        required
+                      >
+                        <option value="" disabled>
+                          Selecciona un deudor
                         </option>
-                      ))}
-                    </select>
-                  </label>
+                        {debtors.map((debtor) => (
+                          <option key={debtor.id} value={debtor.id}>
+                            {debtor.name} ({debtor.email})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <label>
+                      Deudor
+                      <input value={session?.email ?? "-"} readOnly />
+                    </label>
+                  )}
                   <label>
                     Mes
                     <select
@@ -1231,11 +1577,13 @@ function App() {
                   <div className="form-actions">
                     <button type="submit">Buscar cuotas impagas</button>
                   </div>
-                  <div className="form-actions">
-                    <button type="button" className="secondary" onClick={openDebtsFromDebtorProfile}>
-                      Crear deuda
-                    </button>
-                  </div>
+                  {isAdmin ? (
+                    <div className="form-actions">
+                      <button type="button" className="secondary" onClick={openDebtsFromDebtorProfile}>
+                        Crear deuda
+                      </button>
+                    </div>
+                  ) : null}
                 </form>
               </section>
 
@@ -1261,13 +1609,15 @@ function App() {
                     Resultado para {getMonthLabel(debtorMonthlyQuery.month)} {debtorMonthlyQuery.year}
                   </p>
                   <div className="form-actions split" style={{ marginTop: "0.6rem" }}>
-                    <button
-                      type="button"
-                      onClick={requestPayMonthlySalary}
-                      disabled={salaryPaying || salarySnapshotLoading}
-                    >
-                      {salaryPaying ? "Pagando..." : "Pagar sueldo"}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={requestPayMonthlySalary}
+                        disabled={salaryPaying || salarySnapshotLoading}
+                      >
+                        {salaryPaying ? "Pagando..." : "Pagar sueldo"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="secondary"
@@ -1325,7 +1675,7 @@ function App() {
                             </td>
                             <td data-label="Sueldo">{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
                             <td data-label="Acción">
-                              {item.paid ? (
+                              {item.paid || !isAdmin ? (
                                 <span className="muted">Sin acción</span>
                               ) : (
                                 <button

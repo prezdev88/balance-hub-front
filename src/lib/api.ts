@@ -2,12 +2,14 @@ import type {
   ApiErrorResponse,
   CreateDebtResponse,
   CreateDebtorResponse,
+  DebtorAccessResponse,
   GetDebtDetailResponse,
   CreateRecurringExpenseResponse,
   CreateSavingsGoalResponse,
   CreateSalaryResponse,
   ExpenseType,
   GetMonthlyFreeAmountResponse,
+  LoginResponse,
   SalarySnapshot,
   PayMonthlySalaryResponse,
   GetUnpaidInstallmentsByMonthResponse,
@@ -22,6 +24,7 @@ type RequestOptions = RequestInit & {
 };
 
 const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? "/api").replace(/\/$/, "");
+let authToken: string | null = null;
 
 class ApiClientError extends Error {
   status: number;
@@ -48,6 +51,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     ...rest,
     headers: {
       "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...headers
     },
     body: bodyJson !== undefined ? JSON.stringify(bodyJson) : rest.body
@@ -81,6 +85,7 @@ async function requestBlob(path: string, options: RequestOptions = {}): Promise<
   const response = await fetch(resolvedPath, {
     ...rest,
     headers: {
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...headers
     },
     body: bodyJson !== undefined ? JSON.stringify(bodyJson) : rest.body
@@ -96,6 +101,20 @@ async function requestBlob(path: string, options: RequestOptions = {}): Promise<
 export { ApiClientError };
 
 export const api = {
+  setAuthToken(token: string | null) {
+    authToken = token;
+  },
+  login(payload: { email: string; password: string }) {
+    return request<LoginResponse>("/api/auth/login", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  logout() {
+    return request<void>("/api/auth/logout", {
+      method: "POST"
+    });
+  },
   listDebtors() {
     return request<ListDebtorsResponse>("/api/debtors");
   },
@@ -202,5 +221,22 @@ export const api = {
       month: String(payload.month)
     });
     return request<GetUnpaidInstallmentsByMonthResponse>(`/api/installments/unpaid?${params.toString()}`);
+  },
+  grantDebtorAccess(debtorId: string, payload?: { password?: string }) {
+    return request<DebtorAccessResponse>(`/api/admin/debtors/${debtorId}/access/grant`, {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  resetDebtorPassword(debtorId: string, payload?: { password?: string }) {
+    return request<DebtorAccessResponse>(`/api/admin/debtors/${debtorId}/access/password`, {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  revokeDebtorAccess(debtorId: string) {
+    return request<DebtorAccessResponse>(`/api/admin/debtors/${debtorId}/access/revoke`, {
+      method: "POST"
+    });
   }
 };

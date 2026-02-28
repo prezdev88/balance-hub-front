@@ -1,4 +1,5 @@
 export type ExpenseType = "FIXED" | "OPTIONAL";
+export type UserRole = "ADMIN" | "DEBTOR";
 
 export type ApiErrorResponse = {
   timestamp: string;
@@ -12,6 +13,7 @@ export type Debtor = {
   name: string;
   email: string;
   totalDebt: string;
+  accessEnabled: boolean;
 };
 
 export type ListDebtorsResponse = {
@@ -143,4 +145,22 @@ export type GetDebtDetailResponse = {
   name: string;
   email: string;
   debt: Debt;
+};
+
+export type LoginResponse = {
+  accessToken: string;
+  tokenType: string;
+  expiresAt: string;
+  userId: string;
+  email: string;
+  role: UserRole;
+  debtorId: string | null;
+};
+
+export type DebtorAccessResponse = {
+  debtorId: string;
+  email: string;
+  enabled: boolean;
+  password: string | null;
+  passwordGenerated: boolean;
 };
