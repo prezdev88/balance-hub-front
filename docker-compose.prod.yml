@@ -11,6 +11,7 @@ services:
     networks:
       - balance-hub-front-net
       - balance-hub-net
+      - proxy-net
 
 networks:
   balance-hub-front-net:
@@ -18,3 +19,6 @@ networks:
   balance-hub-net:
     external: true
     name: balance-hub-net
+  proxy-net:
+    external: true
+    name: proxy-net

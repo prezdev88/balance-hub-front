@@ -2,6 +2,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+ENV VITE_BASE_PATH=/balance/
+ENV VITE_API_BASE_PATH=/balance/api
+
 COPY package*.json ./
 RUN npm ci
 

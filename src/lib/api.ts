@@ -21,6 +21,8 @@ type RequestOptions = RequestInit & {
   bodyJson?: unknown;
 };
 
+const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? "/api").replace(/\/$/, "");
+
 class ApiClientError extends Error {
   status: number;
 
@@ -31,10 +33,18 @@ class ApiClientError extends Error {
   }
 }
 
+function resolvePath(path: string): string {
+  if (path === "/api" || path.startsWith("/api/")) {
+    return path.replace(/^\/api(?=\/|$)/, API_BASE_PATH);
+  }
+  return path;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { bodyJson, headers, ...rest } = options;
+  const resolvedPath = resolvePath(path);
 
-  const response = await fetch(path, {
+  const response = await fetch(resolvedPath, {
     ...rest,
     headers: {
       "Content-Type": "application/json",
@@ -67,7 +77,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
   const { bodyJson, headers, ...rest } = options;
-  const response = await fetch(path, {
+  const resolvedPath = resolvePath(path);
+  const response = await fetch(resolvedPath, {
     ...rest,
     headers: {
       ...headers
