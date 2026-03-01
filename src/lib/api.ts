@@ -10,6 +10,7 @@ import type {
   ExpenseType,
   GetMonthlyFreeAmountResponse,
   LoginResponse,
+  MonthlySummaryReportResponse,
   SalaryPreviewResponse,
   PayMonthlySalaryResponse,
   GetUnpaidInstallmentsByMonthResponse,
@@ -79,25 +80,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await response.json()) as T;
 }
 
-async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
-  const { bodyJson, headers, ...rest } = options;
-  const resolvedPath = resolvePath(path);
-  const response = await fetch(resolvedPath, {
-    ...rest,
-    headers: {
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...headers
-    },
-    body: bodyJson !== undefined ? JSON.stringify(bodyJson) : rest.body
-  });
-
-  if (!response.ok) {
-    throw new ApiClientError(`HTTP ${response.status}`, response.status);
-  }
-
-  return response.blob();
-}
-
 export { ApiClientError };
 
 export const api = {
@@ -160,13 +142,13 @@ export const api = {
       bodyJson: payload
     });
   },
-  downloadMonthlySummaryPdf(payload: { debtorId: string; year: number; month: number }) {
+  getMonthlySummaryReport(payload: { debtorId: string; year: number; month: number }) {
     const params = new URLSearchParams({
       debtorId: payload.debtorId,
       year: String(payload.year),
       month: String(payload.month)
     });
-    return requestBlob(`/api/reports/monthly-summary.pdf?${params.toString()}`);
+    return request<MonthlySummaryReportResponse>(`/api/reports/monthly-summary?${params.toString()}`);
   },
   createRecurringExpense(payload: { description: string; amount: number; type: ExpenseType }) {
     return request<CreateRecurringExpenseResponse>("/api/recurring-expenses", {

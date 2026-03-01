@@ -174,3 +174,29 @@ export type DebtorAccessResponse = {
   password: string | null;
   passwordGenerated: boolean;
 };
+
+export type MonthlySummaryInstallmentItem = {
+  installmentId: string;
+  debtDescription: string;
+  installmentNumber: number;
+  totalInstallments: number;
+  dueDate: string;
+  amount: string;
+  paid: boolean;
+  paidAt: string | null;
+};
+
+export type MonthlySummaryReportResponse = {
+  debtorId: string;
+  debtorName: string;
+  debtorEmail: string;
+  year: number;
+  month: number;
+  monthlyFreeAmount: string;
+  halfFreeAmount: string;
+  totalInstallmentsAmount: string;
+  salaryColumnAmount: string;
+  salaryStatus: "PAID" | "PENDING" | null;
+  salaryPaidAt: string | null;
+  installments: MonthlySummaryInstallmentItem[];
+};

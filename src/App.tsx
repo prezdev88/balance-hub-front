@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiClientError, api } from "./lib/api";
+import { generateMonthlySummaryPdfBlob } from "./lib/monthlySummaryPdf";
 import type {
   DebtorAccessResponse,
   LoginResponse,
@@ -881,11 +882,12 @@ function App() {
     if (!debtorMonthlyQuery.debtorId) return;
     setNotice(null);
     try {
-      const pdfBlob = await api.downloadMonthlySummaryPdf({
+      const summary = await api.getMonthlySummaryReport({
         debtorId: debtorMonthlyQuery.debtorId,
         year: debtorMonthlyQuery.year,
         month: debtorMonthlyQuery.month
       });
+      const pdfBlob = await generateMonthlySummaryPdfBlob(summary);
       const url = URL.createObjectURL(pdfBlob);
       const anchor = document.createElement("a");
       anchor.href = url;
