@@ -36,12 +36,6 @@ export type CreateSavingsGoalResponse = {
   createdAt: string;
 };
 
-export type MonthlyFreeAmountItem = {
-  month: number;
-  year: number;
-  freeAmount: string;
-};
-
 export type GetMonthlyFreeAmountResponse = {
   year: number;
   currentSalary: string;
@@ -49,7 +43,6 @@ export type GetMonthlyFreeAmountResponse = {
   monthlyFixedExpenses: string;
   monthlyOptionalExpenses: string;
   monthlyFreeAmount: string;
-  months: MonthlyFreeAmountItem[];
 };
 
 export type SalarySnapshotStatus = "PENDING" | "PAID";

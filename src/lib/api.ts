@@ -124,9 +124,13 @@ export const api = {
       bodyJson: payload
     });
   },
-  getMonthlyFreeAmount(year: number) {
-    const params = new URLSearchParams({ year: String(year) });
-    return request<GetMonthlyFreeAmountResponse>(`/api/financial-plan/monthly-free-amount?${params.toString()}`);
+  getMonthlyFreeAmount(year?: number) {
+    const params = new URLSearchParams();
+    if (typeof year === "number") params.set("year", String(year));
+    const query = params.toString();
+    return request<GetMonthlyFreeAmountResponse>(
+      `/api/financial-plan/monthly-free-amount${query ? `?${query}` : ""}`
+    );
   },
   getSalaryPreview(payload: { debtorId: string; year: number; month: number }) {
     const params = new URLSearchParams({

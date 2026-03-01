@@ -5,10 +5,10 @@ import { generateMonthlySummaryPdfBlob } from "./lib/monthlySummaryPdf";
 import type {
   DebtorAccessResponse,
   LoginResponse,
-  GetMonthlyFreeAmountResponse,
   Debt,
   Debtor,
   ExpenseType,
+  GetMonthlyFreeAmountResponse,
   GetDebtDetailResponse,
   GetUnpaidInstallmentsByMonthResponse,
   RecurringExpense,
@@ -265,6 +265,7 @@ function App() {
   const [debtDetail, setDebtDetail] = useState<Debt | null>(null);
   const [debtDetailPage, setDebtDetailPage] = useState(1);
   const [debtCreationDebtorContext, setDebtCreationDebtorContext] = useState<DebtCreationDebtorContext>(null);
+  const [createDebtorModalOpen, setCreateDebtorModalOpen] = useState(false);
 
   const [debtorForm, setDebtorForm] = useState({ name: "", email: "" });
   const [salaryAmount, setSalaryAmount] = useState("");
@@ -279,13 +280,12 @@ function App() {
     amount: string;
     createdAt: string;
   } | null>(null);
-  const [monthlyFreeAmountYear, setMonthlyFreeAmountYear] = useState(getCurrentYear());
-  const [monthlyFreeAmountLoading, setMonthlyFreeAmountLoading] = useState(false);
-  const [monthlyFreeAmountResult, setMonthlyFreeAmountResult] = useState<GetMonthlyFreeAmountResponse | null>(null);
   const [salarySnapshot, setSalarySnapshot] = useState<SalarySnapshot | null>(null);
   const [salaryPreviewAmount, setSalaryPreviewAmount] = useState<string>("0");
   const [salarySnapshotLoading, setSalarySnapshotLoading] = useState(false);
   const [salaryPaying, setSalaryPaying] = useState(false);
+  const [monthlyFreeAmountLoading, setMonthlyFreeAmountLoading] = useState(false);
+  const [monthlyFreeAmountResult, setMonthlyFreeAmountResult] = useState<GetMonthlyFreeAmountResponse | null>(null);
   const [recurringForm, setRecurringForm] = useState<{
     description: string;
     amount: string;
@@ -364,13 +364,15 @@ function App() {
           fixedList,
           optionalList,
           fixedTotal,
-          optionalTotal
+          optionalTotal,
+          monthlyFreeAmount
         ] = await Promise.all([
           api.listDebtors(),
           api.listRecurringExpenses("FIXED"),
           api.listRecurringExpenses("OPTIONAL"),
           api.getRecurringExpenseTotal("FIXED"),
-          api.getRecurringExpenseTotal("OPTIONAL")
+          api.getRecurringExpenseTotal("OPTIONAL"),
+          api.getMonthlyFreeAmount(getCurrentYear())
         ]);
 
         setDebtors(debtorsResponse.debtors);
@@ -382,6 +384,7 @@ function App() {
           FIXED: fixedTotal.total,
           OPTIONAL: optionalTotal.total
         });
+        setMonthlyFreeAmountResult(monthlyFreeAmount);
 
         setDebtForm((current) => ({
           ...current,
@@ -391,9 +394,6 @@ function App() {
           ...current,
           debtorId: current.debtorId || debtorsResponse.debtors[0]?.id || ""
         }));
-        startTransition(() => {
-          void loadMonthlyFreeAmount(getCurrentYear(), true);
-        });
       } else {
         const debtorId = currentSession.debtorId ?? "";
         if (!debtorId) {
@@ -503,10 +503,10 @@ function App() {
       setDebtors([]);
       setRecurringExpenses(EMPTY_RECURRING);
       setRecurringTotals(EMPTY_TOTALS);
-      setMonthlyFreeAmountResult(null);
       setUnpaidByMonthResult(null);
       setSalarySnapshot(null);
       setSalaryPreviewAmount("0");
+      setMonthlyFreeAmountResult(null);
       setDebtDetailModal(null);
       setDebtDetail(null);
       setPendingDebtorAccessAction(null);
@@ -597,6 +597,7 @@ function App() {
         email: debtorForm.email.trim()
       });
       setDebtorForm({ name: "", email: "" });
+      setCreateDebtorModalOpen(false);
       await reloadDebtors();
       setNotice({ type: "success", text: "Deudor creado correctamente." });
     } catch (error) {
@@ -611,7 +612,7 @@ function App() {
       const created = await api.createSalary({ amount: parseAmountInput(salaryAmount) });
       setSalaryAmount("");
       setSalaryLastCreated(created);
-      await loadMonthlyFreeAmount(monthlyFreeAmountYear, true);
+      await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Sueldo registrado correctamente." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -625,28 +626,10 @@ function App() {
       const created = await api.createSavingsGoal({ amount: parseAmountInput(savingsGoalAmount) });
       setSavingsGoalAmount("");
       setSavingsGoalLastCreated(created);
-      await loadMonthlyFreeAmount(monthlyFreeAmountYear, true);
+      await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Ahorro mensual registrado correctamente." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
-    }
-  }
-
-  async function loadMonthlyFreeAmount(year: number, silentNotice = false) {
-    setMonthlyFreeAmountLoading(true);
-    if (!silentNotice) {
-      setNotice(null);
-    }
-    try {
-      const result = await api.getMonthlyFreeAmount(year);
-      setMonthlyFreeAmountResult(result);
-    } catch (error) {
-      setMonthlyFreeAmountResult(null);
-      if (!silentNotice) {
-        setNotice({ type: "error", text: toErrorMessage(error) });
-      }
-    } finally {
-      setMonthlyFreeAmountLoading(false);
     }
   }
 
@@ -662,6 +645,7 @@ function App() {
       const typeToRefresh = recurringForm.type;
       setRecurringForm({ description: "", amount: "", type: typeToRefresh });
       await reloadRecurring(typeToRefresh);
+      await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Gasto recurrente creado." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -680,6 +664,7 @@ function App() {
       const typeToRefresh = recurringEditing.type;
       setRecurringEditing(null);
       await reloadRecurring(typeToRefresh);
+      await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Gasto recurrente actualizado." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -696,6 +681,7 @@ function App() {
       await api.deleteRecurringExpense(target.id);
       setRecurringEditing((current) => (current?.id === target.id ? null : current));
       await reloadRecurring(target.type);
+      await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Gasto recurrente eliminado." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -716,6 +702,16 @@ function App() {
     const target = pendingRecurringDelete;
     setPendingRecurringDelete(null);
     await deleteRecurringExpenseByTarget(target);
+  }
+
+  async function loadMonthlyFreeAmount() {
+    setMonthlyFreeAmountLoading(true);
+    try {
+      const result = await api.getMonthlyFreeAmount(getCurrentYear());
+      setMonthlyFreeAmountResult(result);
+    } finally {
+      setMonthlyFreeAmountLoading(false);
+    }
   }
 
   async function handleCreateDebt(event: React.FormEvent) {
@@ -1160,6 +1156,47 @@ function App() {
         </div>
       ) : null}
 
+      {createDebtorModalOpen ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setCreateDebtorModalOpen(false)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-debtor-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <form className="form-grid" onSubmit={handleCreateDebtor}>
+              <h3 id="create-debtor-title">Crear deudor</h3>
+              <label>
+                Nombre
+                <input
+                  value={debtorForm.name}
+                  onChange={(event) => setDebtorForm((c) => ({ ...c, name: event.target.value }))}
+                  placeholder="Juan Pérez"
+                  required
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={debtorForm.email}
+                  onChange={(event) => setDebtorForm((c) => ({ ...c, email: event.target.value }))}
+                  placeholder="juan@email.com"
+                  required
+                />
+              </label>
+              <div className="form-actions split">
+                <button type="submit">Guardar</button>
+                <button type="button" className="secondary" onClick={() => setCreateDebtorModalOpen(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {!session ? null : recurringEditing ? (
         <div className="modal-backdrop" role="presentation" onClick={() => setRecurringEditing(null)}>
           <div
@@ -1461,30 +1498,11 @@ function App() {
         <main className="grid">
           {activeTab === "debtors" && (
             <Section title="Deudores" description="Crea y visualiza deudores disponibles para asociar deudas.">
-              <form className="form-grid" onSubmit={handleCreateDebtor}>
-                <label>
-                  Nombre
-                  <input
-                    value={debtorForm.name}
-                    onChange={(event) => setDebtorForm((c) => ({ ...c, name: event.target.value }))}
-                    placeholder="Juan Pérez"
-                    required
-                  />
-                </label>
-                <label>
-                  Email
-                  <input
-                    type="email"
-                    value={debtorForm.email}
-                    onChange={(event) => setDebtorForm((c) => ({ ...c, email: event.target.value }))}
-                    placeholder="juan@email.com"
-                    required
-                  />
-                </label>
-                <div className="form-actions">
-                  <button type="submit">Crear deudor</button>
-                </div>
-              </form>
+              <div className="form-actions" style={{ marginBottom: "0.8rem" }}>
+                <button type="button" onClick={() => setCreateDebtorModalOpen(true)}>
+                  Nuevo deudor
+                </button>
+              </div>
 
               {debtorAccessResult ? (
                 <div className="info-card">
@@ -1861,82 +1879,34 @@ function App() {
               </div>
 
               <div className="subpanel">
-                <h3>Monto libre por mes</h3>
-                <form
-                  className="form-grid compact"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void loadMonthlyFreeAmount(monthlyFreeAmountYear);
-                  }}
-                >
-                  <label>
-                    Año
-                    <input
-                      type="number"
-                      min="1970"
-                      max="9999"
-                      value={monthlyFreeAmountYear}
-                      onChange={(event) => setMonthlyFreeAmountYear(Number(event.target.value))}
-                      required
-                    />
-                  </label>
-                  <div className="form-actions">
-                    <button type="submit">Consultar</button>
+                <h3>Monto libre mensual</h3>
+                {monthlyFreeAmountLoading ? <p className="muted">Calculando...</p> : null}
+                {!monthlyFreeAmountLoading && monthlyFreeAmountResult ? (
+                  <div className="summary-row salary-summary-row">
+                    <div className="stat">
+                      <span>Sueldo actual</span>
+                      <strong>{formatCurrency(monthlyFreeAmountResult.currentSalary)}</strong>
+                    </div>
+                    <div className="stat">
+                      <span>Ahorro mensual</span>
+                      <strong>{formatCurrency(monthlyFreeAmountResult.monthlySavingsGoal)}</strong>
+                    </div>
+                    <div className="stat">
+                      <span>Gastos fijos</span>
+                      <strong>{formatCurrency(monthlyFreeAmountResult.monthlyFixedExpenses)}</strong>
+                    </div>
+                    <div className="stat">
+                      <span>Gastos opcionales</span>
+                      <strong>{formatCurrency(monthlyFreeAmountResult.monthlyOptionalExpenses)}</strong>
+                    </div>
+                    <div className="stat total">
+                      <span>Monto libre</span>
+                      <strong>{formatCurrency(monthlyFreeAmountResult.monthlyFreeAmount)}</strong>
+                    </div>
                   </div>
-                </form>
-
-                <div className="summary-row">
-                  <div className="stat">
-                    <span>Sueldo actual</span>
-                    <strong>{formatCurrency(monthlyFreeAmountResult?.currentSalary ?? 0)}</strong>
-                  </div>
-                  <div className="stat">
-                    <span>Ahorro mensual</span>
-                    <strong>{formatCurrency(monthlyFreeAmountResult?.monthlySavingsGoal ?? 0)}</strong>
-                  </div>
-                  <div className="stat expense-fixed">
-                    <span>Gastos fijos</span>
-                    <strong>{formatCurrency(monthlyFreeAmountResult?.monthlyFixedExpenses ?? 0)}</strong>
-                  </div>
-                  <div className="stat expense-optional">
-                    <span>Gastos opcionales</span>
-                    <strong>{formatCurrency(monthlyFreeAmountResult?.monthlyOptionalExpenses ?? 0)}</strong>
-                  </div>
-                  <div className="stat">
-                    <span>Monto libre mensual</span>
-                    <strong>{formatCurrency(monthlyFreeAmountResult?.monthlyFreeAmount ?? 0)}</strong>
-                  </div>
-                </div>
-
-                {monthlyFreeAmountLoading ? <p className="muted">Calculando monto libre...</p> : null}
-
-                {monthlyFreeAmountResult ? (
-                  <div className="table-wrap">
-                    <table className="card-table">
-                      <thead>
-                        <tr>
-                          <th>Mes</th>
-                          <th>Año</th>
-                          <th>Monto libre</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyFreeAmountResult.months.map((item) => (
-                          <tr key={`${item.year}-${item.month}`}>
-                            <td data-label="Mes">
-                              {MONTH_OPTIONS.find((month) => month.value === item.month)?.label ?? item.month}
-                            </td>
-                            <td data-label="Año">{item.year}</td>
-                            <td data-label="Monto libre">{formatCurrency(item.freeAmount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="muted">Consulta un año para ver el monto libre por mes.</p>
-                )}
+                ) : null}
               </div>
+
             </Section>
           )}
 

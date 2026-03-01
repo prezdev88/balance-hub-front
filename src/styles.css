@@ -336,6 +336,15 @@ th {
   margin-bottom: 1rem;
 }
 
+.salary-summary-row {
+  margin-top: 1.15rem;
+  gap: 0.9rem;
+}
+
+.salary-summary-row .stat.total {
+  grid-column: 1 / -1;
+}
+
 .stat {
   border: 1px solid #dbe7f4;
   border-radius: 12px;
@@ -587,6 +596,16 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .salary-summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.95rem;
+    margin-top: 1.35rem;
+  }
+
+  .salary-summary-row .stat.total {
+    grid-column: 1 / -1;
+  }
+
   .form-grid.compact {
     grid-template-columns: 1fr;
     align-items: stretch;
@@ -689,6 +708,11 @@ th {
 
   .table-wrap {
     overflow: visible;
+  }
+
+  .salary-summary-row {
+    gap: 1rem;
+    margin-top: 1.45rem;
   }
 
   .card-table {
