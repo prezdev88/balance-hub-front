@@ -669,24 +669,34 @@ th {
 
   .card-table tbody {
     display: grid;
-    gap: 0.65rem;
+    gap: 0.95rem;
   }
 
   .card-table tr {
     display: block;
     border: 1px solid #dbe6f2;
-    border-radius: 12px;
+    border-radius: 14px;
     background: #fafdff;
     overflow: hidden;
+    box-shadow: 0 6px 14px rgba(18, 39, 72, 0.08);
+  }
+
+  .card-table tr:nth-child(odd) {
+    border-left: 4px solid #4a90e2;
+  }
+
+  .card-table tr:nth-child(even) {
+    border-left: 4px solid #2f9e6f;
   }
 
   .card-table td {
     display: grid;
     grid-template-columns: minmax(90px, 42%) 1fr;
-    gap: 0.5rem;
+    gap: 0.6rem;
     align-items: start;
     border-bottom: 1px solid #e6eef8;
     word-break: break-word;
+    padding: 0.62rem 0.72rem;
   }
 
   .card-table td::before {
@@ -820,6 +830,15 @@ th {
   :root[data-theme="dark"] .card-table tr {
     background: #111c2c;
     border-color: #24364e;
+    box-shadow: 0 0 0 1px rgba(85, 118, 156, 0.18);
+  }
+
+  :root[data-theme="dark"] .card-table tr:nth-child(odd) {
+    border-left-color: #4a90e2;
+  }
+
+  :root[data-theme="dark"] .card-table tr:nth-child(even) {
+    border-left-color: #1ea97a;
   }
 
   :root[data-theme="dark"] .card-table td {
