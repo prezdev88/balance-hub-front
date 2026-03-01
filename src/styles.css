@@ -208,6 +208,36 @@ button.danger {
   color: #fff;
 }
 
+.pay-btn {
+  background: #1f8f4e;
+  color: #fff;
+  border: 1px solid #1a7a42;
+}
+
+.pay-btn:hover {
+  background: #18733f;
+}
+
+.salary-pay-btn {
+  background: #0b6fb8;
+  color: #fff;
+  border: 1px solid #095f9c;
+}
+
+.salary-pay-btn:hover {
+  background: #095b96;
+}
+
+.pdf-btn {
+  background: #7a3ec8;
+  color: #fff;
+  border: 1px solid #6932ad;
+}
+
+.pdf-btn:hover {
+  background: #6534a5;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -802,6 +832,24 @@ th {
   background: #16253a;
   color: #cfe1fb;
   border-color: #2e4464;
+}
+
+:root[data-theme="dark"] .pay-btn {
+  background: #1f8f4e;
+  border-color: #2db16a;
+  color: #f4fff8;
+}
+
+:root[data-theme="dark"] .salary-pay-btn {
+  background: #0b6fb8;
+  border-color: #47a6eb;
+  color: #f1f8ff;
+}
+
+:root[data-theme="dark"] .pdf-btn {
+  background: #7a3ec8;
+  border-color: #9e6ae0;
+  color: #f7f0ff;
 }
 
 :root[data-theme="dark"] .link-btn {

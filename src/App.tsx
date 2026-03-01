@@ -1280,8 +1280,8 @@ function App() {
             </p>
             <p>Vencimiento: {formatDate(pendingInstallmentPayment.dueDate)}</p>
             <div className="form-actions split">
-              <button type="button" onClick={() => void confirmPayInstallment()}>
-                Sí, pagar cuota
+              <button type="button" className="pay-btn" onClick={() => void confirmPayInstallment()}>
+                ✓ Pagar cuota
               </button>
               <button type="button" className="secondary" onClick={() => setPendingInstallmentPayment(null)}>
                 Cancelar
@@ -1311,8 +1311,8 @@ function App() {
               Monto: <strong>{pendingSalaryPayment.amount}</strong>
             </p>
             <div className="form-actions split">
-              <button type="button" onClick={() => void confirmPayMonthlySalary()}>
-                Sí, pagar sueldo
+              <button type="button" className="salary-pay-btn" onClick={() => void confirmPayMonthlySalary()}>
+                ✓ Pagar sueldo
               </button>
               <button type="button" className="secondary" onClick={() => setPendingSalaryPayment(null)}>
                 Cancelar
@@ -1399,12 +1399,12 @@ function App() {
                               ) : (
                                 <button
                                   type="button"
-                                  className="secondary"
+                                  className="pay-btn"
                                   onClick={() =>
                                     requestPayInstallment(installment.id, installment.amount, installment.dueDate)
                                   }
                                 >
-                                  Pagar ahora
+                                  ✓ Pagar ahora
                                 </button>
                               )}
                             </td>
@@ -1705,15 +1705,16 @@ function App() {
                     {isAdmin ? (
                       <button
                         type="button"
+                        className="salary-pay-btn"
                         onClick={requestPayMonthlySalary}
                         disabled={salaryPaying || salarySnapshotLoading}
                       >
-                        {salaryPaying ? "Pagando..." : "Pagar sueldo"}
+                        {salaryPaying ? "Pagando..." : "✓ Pagar sueldo"}
                       </button>
                     ) : null}
                     <button
                       type="button"
-                      className="secondary"
+                      className="pdf-btn"
                       onClick={() => void handleDownloadMonthlyPdf()}
                       disabled={!debtorMonthlyQuery.debtorId || unpaidByMonthLoading}
                     >
@@ -1773,10 +1774,10 @@ function App() {
                               ) : (
                                 <button
                                   type="button"
-                                  className="secondary"
+                                  className="pay-btn"
                                   onClick={() => requestPayInstallment(item.installmentId, item.amount, item.dueDate)}
                                 >
-                                  Pagar
+                                  ✓ Pagar
                                 </button>
                               )}
                             </td>
@@ -2002,9 +2003,6 @@ function App() {
                   <div className={`subpanel ${getExpenseTypeClassName(type)}`} key={type}>
                     <div className="subpanel-title">
                       <h3>{getExpenseTypeLabel(type)}</h3>
-                      <button type="button" className="secondary" onClick={() => void reloadRecurring(type)}>
-                        Recargar
-                      </button>
                     </div>
                     <ul className="list">
                       {recurringExpenses[type].length === 0 ? (
