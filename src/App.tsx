@@ -409,7 +409,7 @@ function App() {
           ...current,
           debtorId
         }));
-        await loadDebtorMonthData(debtorId, getCurrentYear(), getCurrentMonth(), true);
+        await loadDebtorMonthData(debtorId, getCurrentYear(), getCurrentMonth());
       }
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 401) {
@@ -806,15 +806,10 @@ function App() {
       return;
     }
 
-    await loadDebtorMonthData(
-      debtorMonthlyQuery.debtorId,
-      debtorMonthlyQuery.year,
-      debtorMonthlyQuery.month,
-      isDebtor
-    );
+    await loadDebtorMonthData(debtorMonthlyQuery.debtorId, debtorMonthlyQuery.year, debtorMonthlyQuery.month);
   }
 
-  async function loadDebtorMonthData(debtorId: string, year: number, month: number, debtorMode = false) {
+  async function loadDebtorMonthData(debtorId: string, year: number, month: number) {
     if (!debtorId) return;
 
     setUnpaidByMonthLoading(true);
@@ -824,28 +819,11 @@ function App() {
     try {
       const result = await api.getUnpaidInstallmentsByMonth({ debtorId, year, month });
       setUnpaidByMonthResult(result);
-      if (debtorMode) {
-        setSalaryPreviewAmount("0");
-      } else {
-        const monthlyFreeAmount = await api.getMonthlyFreeAmount(year);
-        const totalInstallments = result.installments.reduce((sum, item) => sum + Number(item.amount), 0);
-        const preview = Number(monthlyFreeAmount.monthlyFreeAmount) / 2 - totalInstallments;
-        setSalaryPreviewAmount(String(preview));
-      }
       setSalarySnapshotLoading(true);
       try {
-        const snapshot = await api.getSalarySnapshot({
-          debtorId,
-          year,
-          month
-        });
-        setSalarySnapshot(snapshot);
-      } catch (error) {
-        if (error instanceof ApiClientError && error.status === 404) {
-          setSalarySnapshot(null);
-        } else {
-          throw error;
-        }
+        const preview = await api.getSalaryPreview({ debtorId, year, month });
+        setSalaryPreviewAmount(preview.salaryPreviewAmount);
+        setSalarySnapshot(preview.snapshot);
       } finally {
         setSalarySnapshotLoading(false);
       }
@@ -960,7 +938,7 @@ function App() {
     }));
     setActiveTab("debtorProfile");
     startTransition(() => {
-      void loadDebtorMonthData(query.debtorId, query.year, query.month, false);
+      void loadDebtorMonthData(query.debtorId, query.year, query.month);
     });
   }
 

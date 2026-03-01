@@ -10,7 +10,7 @@ import type {
   ExpenseType,
   GetMonthlyFreeAmountResponse,
   LoginResponse,
-  SalarySnapshot,
+  SalaryPreviewResponse,
   PayMonthlySalaryResponse,
   GetUnpaidInstallmentsByMonthResponse,
   ListDebtorsResponse,
@@ -146,13 +146,13 @@ export const api = {
     const params = new URLSearchParams({ year: String(year) });
     return request<GetMonthlyFreeAmountResponse>(`/api/financial-plan/monthly-free-amount?${params.toString()}`);
   },
-  getSalarySnapshot(payload: { debtorId: string; year: number; month: number }) {
+  getSalaryPreview(payload: { debtorId: string; year: number; month: number }) {
     const params = new URLSearchParams({
       debtorId: payload.debtorId,
       year: String(payload.year),
       month: String(payload.month)
     });
-    return request<SalarySnapshot>(`/api/salary-snapshots?${params.toString()}`);
+    return request<SalaryPreviewResponse>(`/api/salary-snapshots/preview?${params.toString()}`);
   },
   payMonthlySalary(payload: { debtorId: string; year: number; month: number; paymentDate: string }) {
     return request<PayMonthlySalaryResponse>("/api/salary-snapshots/pay", {

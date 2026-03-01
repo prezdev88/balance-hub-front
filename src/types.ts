@@ -68,6 +68,15 @@ export type SalarySnapshot = {
   paidAt: string | null;
 };
 
+export type SalaryPreviewResponse = {
+  debtorId: string;
+  year: number;
+  month: number;
+  totalUnpaidInstallments: string;
+  salaryPreviewAmount: string;
+  snapshot: SalarySnapshot | null;
+};
+
 export type PayMonthlySalaryResponse = {
   created: boolean;
   snapshot: SalarySnapshot;
