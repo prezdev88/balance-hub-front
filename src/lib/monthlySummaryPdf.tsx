@@ -60,14 +60,16 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    justifyContent: "space-between",
+    marginTop: 8
   },
   highlightMetric: {
     width: "100%",
     border: "2 solid #1f8f4e",
     borderRadius: 8,
     padding: 10,
-    backgroundColor: "#eefaf3"
+    backgroundColor: "#eefaf3",
+    marginBottom: 4
   },
   highlightMetricLabel: {
     fontSize: 10,
@@ -81,7 +83,7 @@ const styles = StyleSheet.create({
     color: "#14532d"
   },
   metric: {
-    width: "48%",
+    width: "32%",
     border: "1 solid #d9e4f2",
     borderRadius: 6,
     padding: 8,
