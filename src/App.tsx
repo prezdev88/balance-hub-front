@@ -252,7 +252,7 @@ function App() {
   );
   const [bootLoading, setBootLoading] = useState(Boolean(readStoredSession()));
   const [notice, setNotice] = useState<AppNotice>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [loginLoading, setLoginLoading] = useState(false);
   const [passwordChangeForm, setPasswordChangeForm] = useState({
@@ -369,7 +369,7 @@ function App() {
 
   useEffect(() => {
     if (!session || session.mustChangePassword) {
-      setMobileMenuOpen(false);
+      setFabMenuOpen(false);
     }
   }, [session]);
 
@@ -1017,17 +1017,6 @@ function App() {
           <div className="header-top">
             <h1>Balance Hub</h1>
             <div className="header-actions">
-              {canShowNavigation ? (
-                <button
-                  type="button"
-                  className="secondary mobile-menu-btn"
-                  aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-                  aria-expanded={mobileMenuOpen}
-                  onClick={() => setMobileMenuOpen((current) => !current)}
-                >
-                  ☰
-                </button>
-              ) : null}
               {session ? (
                 <button type="button" className="secondary logout-btn" onClick={() => void handleLogout()}>
                   <span className="header-action-icon" aria-hidden="true">
@@ -1063,10 +1052,7 @@ function App() {
               key={tab.key}
               type="button"
               className={tab.key === activeTab ? `tab tab-${tab.key} active` : `tab tab-${tab.key}`}
-              onClick={() => {
-                setActiveTab(tab.key);
-                setMobileMenuOpen(false);
-              }}
+              onClick={() => setActiveTab(tab.key)}
             >
               <span className="tab-icon" aria-hidden="true">
                 <MobileMenuIcon name={tab.key} />
@@ -1078,68 +1064,68 @@ function App() {
       )}
 
       {canShowNavigation ? (
-        <div
-          className={mobileMenuOpen ? "mobile-menu-backdrop open" : "mobile-menu-backdrop"}
-          role="presentation"
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          <aside
-            className={mobileMenuOpen ? "mobile-menu-drawer open" : "mobile-menu-drawer"}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menú principal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mobile-menu-list" role="menu" aria-label="Secciones">
+        <>
+          <div
+            className={fabMenuOpen ? "fab-backdrop open" : "fab-backdrop"}
+            role="presentation"
+            onClick={() => setFabMenuOpen(false)}
+          />
+          <div className="fab-menu-wrapper">
+            <div className={fabMenuOpen ? "fab-actions open" : "fab-actions"} role="menu" aria-label="Menú rápido">
               {availableTabs.map((tab) => (
                 <button
-                  key={tab.key}
+                  key={`fab-${tab.key}`}
                   type="button"
-                  className={
-                    tab.key === activeTab ? `mobile-menu-item mobile-menu-item-${tab.key} active` : `mobile-menu-item mobile-menu-item-${tab.key}`
-                  }
+                  className={tab.key === activeTab ? `fab-action fab-action-${tab.key} active` : `fab-action fab-action-${tab.key}`}
                   onClick={() => {
                     setActiveTab(tab.key);
-                    setMobileMenuOpen(false);
+                    setFabMenuOpen(false);
                   }}
                 >
-                  <span className="mobile-menu-icon" aria-hidden="true">
+                  <span className="fab-action-icon" aria-hidden="true">
                     <MobileMenuIcon name={tab.key} />
                   </span>
                   {tab.label}
                 </button>
               ))}
-            </div>
-            <div className="mobile-menu-footer">
               <button
                 type="button"
-                className="mobile-menu-item mobile-menu-item-theme secondary"
+                className="fab-action fab-action-theme"
                 onClick={() => {
                   toggleThemeMode();
-                  setMobileMenuOpen(false);
+                  setFabMenuOpen(false);
                 }}
               >
-                <span className="mobile-menu-icon" aria-hidden="true">
+                <span className="fab-action-icon" aria-hidden="true">
                   <MobileMenuIcon name="theme" />
                 </span>
                 {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
               </button>
               <button
                 type="button"
-                className="mobile-menu-item mobile-menu-item-logout danger"
+                className="fab-action fab-action-logout danger"
                 onClick={() => {
-                  setMobileMenuOpen(false);
+                  setFabMenuOpen(false);
                   void handleLogout();
                 }}
               >
-                <span className="mobile-menu-icon" aria-hidden="true">
+                <span className="fab-action-icon" aria-hidden="true">
                   <MobileMenuIcon name="logout" />
                 </span>
                 Cerrar sesión
               </button>
             </div>
-          </aside>
-        </div>
+            <button
+              type="button"
+              className={fabMenuOpen ? "fab-main open" : "fab-main"}
+              aria-label={fabMenuOpen ? "Cerrar menú rápido" : "Abrir menú rápido"}
+              aria-expanded={fabMenuOpen}
+              onClick={() => setFabMenuOpen((current) => !current)}
+            >
+              {fabMenuOpen ? "×" : "+"}
+            </button>
+          </div>
+        </>
       ) : null}
 
       {notice ? (
