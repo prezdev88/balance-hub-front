@@ -227,6 +227,18 @@ function Section({
   );
 }
 
+function MobileMenuIcon({ name }: { name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "theme" | "logout" }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 };
+
+  if (name === "debtors") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="M20 8v6" /><path d="M23 11h-6" /></svg>;
+  if (name === "debtorProfile") return <svg {...common}><path d="M20 21a8 8 0 1 0-16 0" /><circle cx="12" cy="7" r="4" /></svg>;
+  if (name === "debts") return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>;
+  if (name === "recurring") return <svg {...common}><path d="M3 12a9 9 0 0 1 15-6l2 2" /><path d="M21 12a9 9 0 0 1-15 6l-2-2" /><path d="M5 8h5V3" /><path d="M19 16h-5v5" /></svg>;
+  if (name === "salary") return <svg {...common}><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6" /></svg>;
+  if (name === "theme") return <svg {...common}><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg>;
+  return <svg {...common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>;
+}
+
 function App() {
   const [session, setSession] = useState<SessionState>(() => readStoredSession());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
@@ -240,6 +252,7 @@ function App() {
   );
   const [bootLoading, setBootLoading] = useState(Boolean(readStoredSession()));
   const [notice, setNotice] = useState<AppNotice>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [loginLoading, setLoginLoading] = useState(false);
   const [passwordChangeForm, setPasswordChangeForm] = useState({
@@ -353,6 +366,12 @@ function App() {
     document.documentElement.setAttribute("data-theme", themeMode);
     window.localStorage.setItem("balance-hub-theme", themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    if (!session || session.mustChangePassword) {
+      setMobileMenuOpen(false);
+    }
+  }, [session]);
 
   async function loadInitialData(currentSession: LoginResponse) {
     setBootLoading(true);
@@ -988,6 +1007,8 @@ function App() {
         debtDetailPage * DEBT_DETAIL_PAGE_SIZE
       )
     : [];
+  const canShowNavigation = Boolean(session && !session.mustChangePassword);
+  const toggleThemeMode = () => setThemeMode((current) => (current === "dark" ? "light" : "dark"));
 
   return (
     <div className="app-shell">
@@ -996,16 +1017,33 @@ function App() {
           <div className="header-top">
             <h1>Balance Hub</h1>
             <div className="header-actions">
+              {canShowNavigation ? (
+                <button
+                  type="button"
+                  className="secondary mobile-menu-btn"
+                  aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+                  aria-expanded={mobileMenuOpen}
+                  onClick={() => setMobileMenuOpen((current) => !current)}
+                >
+                  ☰
+                </button>
+              ) : null}
               {session ? (
-                <button type="button" className="secondary" onClick={() => void handleLogout()}>
+                <button type="button" className="secondary logout-btn" onClick={() => void handleLogout()}>
+                  <span className="header-action-icon" aria-hidden="true">
+                    <MobileMenuIcon name="logout" />
+                  </span>
                   Cerrar sesión
                 </button>
               ) : null}
               <button
                 type="button"
                 className="secondary theme-toggle"
-                onClick={() => setThemeMode((current) => (current === "dark" ? "light" : "dark"))}
+                onClick={toggleThemeMode}
               >
+                <span className="header-action-icon" aria-hidden="true">
+                  <MobileMenuIcon name="theme" />
+                </span>
                 {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
               </button>
             </div>
@@ -1018,20 +1056,91 @@ function App() {
         </div>
       </header>
 
-      {!session || session.mustChangePassword ? null : (
+      {!canShowNavigation ? null : (
         <nav className="tabs" aria-label="Secciones">
           {availableTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
-              className={tab.key === activeTab ? "tab active" : "tab"}
-              onClick={() => setActiveTab(tab.key)}
+              className={tab.key === activeTab ? `tab tab-${tab.key} active` : `tab tab-${tab.key}`}
+              onClick={() => {
+                setActiveTab(tab.key);
+                setMobileMenuOpen(false);
+              }}
             >
+              <span className="tab-icon" aria-hidden="true">
+                <MobileMenuIcon name={tab.key} />
+              </span>
               {tab.label}
             </button>
           ))}
         </nav>
       )}
+
+      {canShowNavigation ? (
+        <div
+          className={mobileMenuOpen ? "mobile-menu-backdrop open" : "mobile-menu-backdrop"}
+          role="presentation"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <aside
+            className={mobileMenuOpen ? "mobile-menu-drawer open" : "mobile-menu-drawer"}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú principal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mobile-menu-list" role="menu" aria-label="Secciones">
+              {availableTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={
+                    tab.key === activeTab ? `mobile-menu-item mobile-menu-item-${tab.key} active` : `mobile-menu-item mobile-menu-item-${tab.key}`
+                  }
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  <span className="mobile-menu-icon" aria-hidden="true">
+                    <MobileMenuIcon name={tab.key} />
+                  </span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="mobile-menu-footer">
+              <button
+                type="button"
+                className="mobile-menu-item mobile-menu-item-theme secondary"
+                onClick={() => {
+                  toggleThemeMode();
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <span className="mobile-menu-icon" aria-hidden="true">
+                  <MobileMenuIcon name="theme" />
+                </span>
+                {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
+              </button>
+              <button
+                type="button"
+                className="mobile-menu-item mobile-menu-item-logout danger"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void handleLogout();
+                }}
+              >
+                <span className="mobile-menu-icon" aria-hidden="true">
+                  <MobileMenuIcon name="logout" />
+                </span>
+                Cerrar sesión
+              </button>
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       {notice ? (
         <div className={notice.type === "error" ? "notice error" : "notice success"} role="status">
