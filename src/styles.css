@@ -449,6 +449,10 @@ th {
   z-index: 1000;
 }
 
+.modal-backdrop.modal-front {
+  z-index: 1100;
+}
+
 .modal {
   width: min(460px, 100%);
   background: #fff;

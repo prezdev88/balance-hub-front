@@ -341,10 +341,12 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    if (!availableTabs.some((tab) => tab.key === activeTab)) {
+    const isAllowed =
+      availableTabs.some((tab) => tab.key === activeTab) || (isAdmin && activeTab === "debts");
+    if (!isAllowed) {
       setActiveTab(availableTabs[0].key);
     }
-  }, [activeTab, availableTabs]);
+  }, [activeTab, availableTabs, isAdmin]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", themeMode);
@@ -1260,7 +1262,11 @@ function App() {
       ) : null}
 
       {pendingInstallmentPayment ? (
-        <div className="modal-backdrop" role="presentation" onClick={() => setPendingInstallmentPayment(null)}>
+        <div
+          className="modal-backdrop modal-front"
+          role="presentation"
+          onClick={() => setPendingInstallmentPayment(null)}
+        >
           <div
             className="modal"
             role="dialog"
@@ -1346,7 +1352,7 @@ function App() {
                       <span className={debtDetail.settled ? "badge success" : "badge warning"}>
                         {debtDetail.settled ? "Saldada" : "Pendiente"}
                       </span>
-                      {isAdmin ? (
+                      {isAdmin && !debtDetail.settled ? (
                         <button
                           type="button"
                           className="danger"
