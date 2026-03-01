@@ -15,8 +15,21 @@ import type {
   SalarySnapshot
 } from "./types";
 
-type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary";
+type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "themes";
 type ThemeMode = "light" | "dark";
+type ThemeKey =
+  | "ocean"
+  | "forest"
+  | "sunset"
+  | "sand"
+  | "slate"
+  | "mint"
+  | "midnight"
+  | "neon"
+  | "ember"
+  | "violet"
+  | "graphite"
+  | "aurora";
 type SessionState = LoginResponse | null;
 
 type AppNotice = {
@@ -95,13 +108,32 @@ const MONTH_OPTIONS = [
 ];
 const DEBT_DETAIL_PAGE_SIZE = 5;
 const SESSION_STORAGE_KEY = "balance-hub-session-v1";
+const THEME_STORAGE_KEY = "balance-hub-theme-v2";
+const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; base: ThemeMode }> = [
+  { key: "ocean", label: "Ocean", base: "light" },
+  { key: "forest", label: "Forest", base: "light" },
+  { key: "sunset", label: "Sunset", base: "light" },
+  { key: "sand", label: "Sand", base: "light" },
+  { key: "slate", label: "Slate", base: "light" },
+  { key: "mint", label: "Mint", base: "light" },
+  { key: "midnight", label: "Midnight", base: "dark" },
+  { key: "neon", label: "Neon", base: "dark" },
+  { key: "ember", label: "Ember", base: "dark" },
+  { key: "violet", label: "Violet", base: "dark" },
+  { key: "graphite", label: "Graphite", base: "dark" },
+  { key: "aurora", label: "Aurora", base: "dark" }
+];
 const ADMIN_TABS: Array<{ key: TabKey; label: string }> = [
   { key: "debtors", label: "Deudores" },
   { key: "debtorProfile", label: "Perfil deudor" },
   { key: "recurring", label: "Gastos recurrentes" },
-  { key: "salary", label: "Sueldos" }
+  { key: "salary", label: "Sueldos" },
+  { key: "themes", label: "Temas" }
 ];
-const DEBTOR_TABS: Array<{ key: TabKey; label: string }> = [{ key: "debtorProfile", label: "Mi perfil" }];
+const DEBTOR_TABS: Array<{ key: TabKey; label: string }> = [
+  { key: "debtorProfile", label: "Mi perfil" },
+  { key: "themes", label: "Temas" }
+];
 
 function getTodayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -207,6 +239,18 @@ function readStoredSession(): SessionState {
   }
 }
 
+function readStoredThemeKey(): ThemeKey {
+  if (typeof window === "undefined") return "ocean";
+  const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (!saved) return "ocean";
+  const found = THEME_OPTIONS.find((theme) => theme.key === saved);
+  return found?.key ?? "ocean";
+}
+
+function getThemeBase(themeKey: ThemeKey): ThemeMode {
+  return THEME_OPTIONS.find((theme) => theme.key === themeKey)?.base ?? "light";
+}
+
 function Section({
   title,
   description,
@@ -227,7 +271,11 @@ function Section({
   );
 }
 
-function MobileMenuIcon({ name }: { name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "theme" | "logout" }) {
+function MobileMenuIcon({
+  name
+}: {
+  name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "themes" | "theme" | "logout";
+}) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 };
 
   if (name === "debtors") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="M20 8v6" /><path d="M23 11h-6" /></svg>;
@@ -235,18 +283,15 @@ function MobileMenuIcon({ name }: { name: "debtors" | "debtorProfile" | "debts" 
   if (name === "debts") return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>;
   if (name === "recurring") return <svg {...common}><path d="M3 12a9 9 0 0 1 15-6l2 2" /><path d="M21 12a9 9 0 0 1-15 6l-2-2" /><path d="M5 8h5V3" /><path d="M19 16h-5v5" /></svg>;
   if (name === "salary") return <svg {...common}><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6" /></svg>;
+  if (name === "themes") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /><path d="M3 12h18" /><path d="M5 5l14 14" /></svg>;
   if (name === "theme") return <svg {...common}><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg>;
   return <svg {...common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>;
 }
 
 function App() {
   const [session, setSession] = useState<SessionState>(() => readStoredSession());
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "light";
-    const saved = window.localStorage.getItem("balance-hub-theme");
-    if (saved === "light" || saved === "dark") return saved;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
+  const [themeKey, setThemeKey] = useState<ThemeKey>(() => readStoredThemeKey());
+  const themeMode: ThemeMode = getThemeBase(themeKey);
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
     readStoredSession()?.role === "DEBTOR" ? "debtorProfile" : "debtors"
   );
@@ -364,8 +409,9 @@ function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", themeMode);
-    window.localStorage.setItem("balance-hub-theme", themeMode);
-  }, [themeMode]);
+    document.documentElement.setAttribute("data-theme-palette", themeKey);
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+  }, [themeKey, themeMode]);
 
   useEffect(() => {
     if (!session || session.mustChangePassword) {
@@ -1008,7 +1054,6 @@ function App() {
       )
     : [];
   const canShowNavigation = Boolean(session && !session.mustChangePassword);
-  const toggleThemeMode = () => setThemeMode((current) => (current === "dark" ? "light" : "dark"));
 
   return (
     <div className="app-shell">
@@ -1025,16 +1070,6 @@ function App() {
                   Cerrar sesión
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="secondary theme-toggle"
-                onClick={toggleThemeMode}
-              >
-                <span className="header-action-icon" aria-hidden="true">
-                  <MobileMenuIcon name="theme" />
-                </span>
-                {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
-              </button>
             </div>
           </div>
           {session ? (
@@ -1088,19 +1123,6 @@ function App() {
                   {tab.label}
                 </button>
               ))}
-              <button
-                type="button"
-                className="fab-action fab-action-theme"
-                onClick={() => {
-                  toggleThemeMode();
-                  setFabMenuOpen(false);
-                }}
-              >
-                <span className="fab-action-icon" aria-hidden="true">
-                  <MobileMenuIcon name="theme" />
-                </span>
-                {themeMode === "dark" ? "Modo claro" : "Modo oscuro"}
-              </button>
               <button
                 type="button"
                 className="fab-action fab-action-logout danger"
@@ -2002,6 +2024,51 @@ function App() {
                 ) : null}
               </div>
 
+            </Section>
+          )}
+
+          {activeTab === "themes" && (
+            <Section
+              title="Temas"
+              description="Elige el estilo visual del sistema. Se guarda automáticamente en tu navegador."
+            >
+              <div className="theme-groups">
+                <div className="theme-group">
+                  <h3>Claros</h3>
+                  <div className="theme-grid">
+                    {THEME_OPTIONS.filter((theme) => theme.base === "light").map((theme) => (
+                      <button
+                        key={theme.key}
+                        type="button"
+                        className={themeKey === theme.key ? "theme-card active" : "theme-card"}
+                        onClick={() => setThemeKey(theme.key)}
+                      >
+                        <span className={`theme-swatch theme-swatch-${theme.key}`} aria-hidden="true" />
+                        <span className="theme-card-title">{theme.label}</span>
+                        <span className="theme-card-mode">Claro</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="theme-group">
+                  <h3>Oscuros</h3>
+                  <div className="theme-grid">
+                    {THEME_OPTIONS.filter((theme) => theme.base === "dark").map((theme) => (
+                      <button
+                        key={theme.key}
+                        type="button"
+                        className={themeKey === theme.key ? "theme-card active" : "theme-card"}
+                        onClick={() => setThemeKey(theme.key)}
+                      >
+                        <span className={`theme-swatch theme-swatch-${theme.key}`} aria-hidden="true" />
+                        <span className="theme-card-title">{theme.label}</span>
+                        <span className="theme-card-mode">Oscuro</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </Section>
           )}
 
