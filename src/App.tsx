@@ -1509,7 +1509,6 @@ function App() {
                       <th>Nombre</th>
                       <th>Email</th>
                       <th>Deuda pendiente</th>
-                      <th>ID</th>
                       <th>Inicio sesión</th>
                       <th>Acceso</th>
                     </tr>
@@ -1517,7 +1516,7 @@ function App() {
                   <tbody>
                     {debtors.length === 0 ? (
                       <tr>
-                        <td className="table-empty" colSpan={6}>
+                        <td className="table-empty" colSpan={5}>
                           No hay deudores registrados.
                         </td>
                       </tr>
@@ -1535,7 +1534,6 @@ function App() {
                           </td>
                           <td data-label="Email">{debtor.email}</td>
                           <td data-label="Deuda pendiente">{formatCurrency(debtor.totalDebt)}</td>
-                          <td data-label="ID" className="mono">{debtor.id}</td>
                           <td data-label="Inicio sesión">
                             <span className={debtor.accessEnabled ? "badge success" : "badge warning"}>
                               {debtor.accessEnabled ? "Habilitado" : "Revocado"}
@@ -1545,7 +1543,9 @@ function App() {
                             <div className="item-actions">
                               <button
                                 type="button"
-                                className="secondary"
+                                className="icon-btn secondary"
+                                aria-label={`Otorgar acceso a ${debtor.name}`}
+                                title="Otorgar acceso"
                                 onClick={() =>
                                   setPendingDebtorAccessAction({
                                     debtorId: debtor.id,
@@ -1554,11 +1554,13 @@ function App() {
                                   })
                                 }
                               >
-                                Otorgar
+                                ✓
                               </button>
                               <button
                                 type="button"
-                                className="secondary"
+                                className="icon-btn secondary"
+                                aria-label={`Cambiar clave de ${debtor.name}`}
+                                title="Cambiar clave"
                                 onClick={() =>
                                   setPendingDebtorAccessAction({
                                     debtorId: debtor.id,
@@ -1567,14 +1569,16 @@ function App() {
                                   })
                                 }
                               >
-                                Clave
+                                🔑
                               </button>
                               <button
                                 type="button"
-                                className="danger"
+                                className="icon-btn danger"
+                                aria-label={`Revocar acceso de ${debtor.name}`}
+                                title="Revocar acceso"
                                 onClick={() => void revokeDebtorAccess(debtor.id)}
                               >
-                                Revocar
+                                ×
                               </button>
                             </div>
                           </td>
