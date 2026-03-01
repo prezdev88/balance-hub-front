@@ -160,6 +160,19 @@ function formatDate(value: string | null): string {
   return `${day}-${month}-${year}`;
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatDate(value);
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = MONTH_ABBREVIATIONS[date.getMonth()];
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
 function getExpenseTypeLabel(type: ExpenseType): string {
   return type === "FIXED" ? "Fijo" : "Opcional";
 }
@@ -1393,7 +1406,9 @@ function App() {
                             <td data-label="#"> {installment.number}</td>
                             <td data-label="Vence">{formatDate(installment.dueDate)}</td>
                             <td data-label="Monto">{formatCurrency(installment.amount)}</td>
-                            <td data-label="Pagada">{installment.paidAt ? formatDate(installment.paidAt) : "No"}</td>
+                            <td data-label="Pagada">
+                              {installment.paidAt ? formatDateTime(installment.paidAt) : "No"}
+                            </td>
                             <td data-label="Acción">
                               {installment.paidAt || !isAdmin ? (
                                 <span className="muted">Sin acción</span>
@@ -1691,7 +1706,13 @@ function App() {
                   <p>
                     <strong>Sueldo (snapshot):</strong>{" "}
                     {formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}
-                    {salarySnapshot ? ` (${salarySnapshot.status})` : " (preview)"}
+                    {salarySnapshot
+                      ? salarySnapshot.status === "PAID"
+                        ? salarySnapshot.paidAt
+                          ? ` (Pagado ${formatDateTime(salarySnapshot.paidAt)})`
+                          : " (Pagado)"
+                        : " (Pendiente)"
+                      : " (preview)"}
                   </p>
                   <p className="muted">
                     Resultado para {getMonthLabel(debtorMonthlyQuery.month)} {debtorMonthlyQuery.year}
