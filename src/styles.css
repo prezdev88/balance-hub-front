@@ -634,6 +634,36 @@ button:focus {
   gap: 0.5rem;
 }
 
+.search-row {
+  margin: 0.35rem 0 0.9rem;
+}
+
+.search-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.search-field input {
+  width: 100%;
+  padding-left: 2.1rem;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.72rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 button {
   border: 0;
   border-radius: 10px;

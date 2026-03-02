@@ -353,6 +353,7 @@ function App() {
     amount: "",
     type: "FIXED"
   });
+  const [recurringSearch, setRecurringSearch] = useState("");
   const [recurringEditing, setRecurringEditing] = useState<{
     id: string;
     type: ExpenseType;
@@ -2132,6 +2133,20 @@ function App() {
                 </div>
               </form>
 
+              <div className="search-row">
+                <label className="search-field">
+                  <span className="search-icon" aria-hidden="true">
+                    🔎
+                  </span>
+                  <input
+                    type="text"
+                    value={recurringSearch}
+                    onChange={(event) => setRecurringSearch(event.target.value)}
+                    placeholder="Buscar gasto por descripción o monto"
+                  />
+                </label>
+              </div>
+
               <div className="two-columns">
                 {(["FIXED", "OPTIONAL"] as ExpenseType[]).map((type) => (
                   <div className={`subpanel ${getExpenseTypeClassName(type)}`} key={type}>
@@ -2139,10 +2154,26 @@ function App() {
                       <h3>{getExpenseTypeLabel(type)}</h3>
                     </div>
                     <ul className="list">
-                      {recurringExpenses[type].length === 0 ? (
+                      {recurringExpenses[type].filter((item) => {
+                        const query = recurringSearch.trim().toLowerCase();
+                        if (!query) return true;
+                        return (
+                          item.description.toLowerCase().includes(query) ||
+                          formatCurrency(item.amount).toLowerCase().includes(query)
+                        );
+                      }).length === 0 ? (
                         <li className="list-item empty">Sin gastos de este tipo.</li>
                       ) : (
-                        recurringExpenses[type].map((item) => (
+                        recurringExpenses[type]
+                          .filter((item) => {
+                            const query = recurringSearch.trim().toLowerCase();
+                            if (!query) return true;
+                            return (
+                              item.description.toLowerCase().includes(query) ||
+                              formatCurrency(item.amount).toLowerCase().includes(query)
+                            );
+                          })
+                          .map((item) => (
                           <li key={item.id} className={`list-item ${getExpenseTypeClassName(type)}`}>
                             <div>
                               <p className="list-title">{item.description}</p>
@@ -2183,7 +2214,7 @@ function App() {
                               </button>
                             </div>
                           </li>
-                        ))
+                          ))
                       )}
                     </ul>
                   </div>
