@@ -4,6 +4,8 @@ import { ApiClientError, api } from "./lib/api";
 import { generateMonthlySummaryPdfBlob } from "./lib/monthlySummaryPdf";
 import type {
   DebtorAccessResponse,
+  GetHouseholdBudgetSummaryResponse,
+  HouseholdBudgetCategory,
   LoginResponse,
   Debt,
   Debtor,
@@ -15,8 +17,9 @@ import type {
   SalarySnapshot
 } from "./types";
 
-type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "themes";
+type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "household" | "themes";
 type ThemeMode = "light" | "dark";
+type HouseholdSubTab = "spend" | "settings";
 type ThemeKey =
   | "ocean"
   | "forest"
@@ -128,6 +131,7 @@ const ADMIN_TABS: Array<{ key: TabKey; label: string }> = [
   { key: "debtorProfile", label: "Perfil deudor" },
   { key: "recurring", label: "Gastos recurrentes" },
   { key: "salary", label: "Sueldos" },
+  { key: "household", label: "Verduras y mercadería" },
   { key: "themes", label: "Temas" }
 ];
 const DEBTOR_TABS: Array<{ key: TabKey; label: string }> = [
@@ -168,6 +172,23 @@ function formatAmountInput(value: string): string {
 function parseAmountInput(value: string): number {
   const digitsOnly = value.replace(/\D/g, "");
   return digitsOnly ? Number(digitsOnly) : 0;
+}
+
+function formatSignedAmountInput(value: string): string {
+  const isNegative = /^\s*-/.test(value);
+  const digitsOnly = value.replace(/\D/g, "");
+  if (!digitsOnly) return isNegative ? "-" : "";
+  const formatted = new Intl.NumberFormat("es-CL", {
+    maximumFractionDigits: 0
+  }).format(Number(digitsOnly));
+  return isNegative ? `-${formatted}` : formatted;
+}
+
+function parseSignedAmountInput(value: string): number {
+  const isNegative = /^\s*-/.test(value);
+  const digitsOnly = value.replace(/\D/g, "");
+  const amount = digitsOnly ? Number(digitsOnly) : 0;
+  return isNegative ? -amount : amount;
 }
 
 const MONTH_ABBREVIATIONS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -216,6 +237,14 @@ function getExpenseTypeClassName(type: ExpenseType): string {
 
 function getMonthLabel(month: number): string {
   return MONTH_OPTIONS.find((item) => item.value === month)?.label.toLowerCase() ?? String(month);
+}
+
+function getHouseholdCategoryLabel(category: HouseholdBudgetCategory): string {
+  return category === "VEGETABLES" ? "Verduras" : "Mercadería";
+}
+
+function getHouseholdCategoryIcon(category: HouseholdBudgetCategory): string {
+  return category === "VEGETABLES" ? "🥦" : "🛒";
 }
 
 function normalizeEmail(value: string): string {
@@ -274,7 +303,7 @@ function Section({
 function MobileMenuIcon({
   name
 }: {
-  name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "themes" | "theme" | "logout";
+  name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "household" | "themes" | "theme" | "logout";
 }) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 };
 
@@ -283,6 +312,7 @@ function MobileMenuIcon({
   if (name === "debts") return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>;
   if (name === "recurring") return <svg {...common}><path d="M3 12a9 9 0 0 1 15-6l2 2" /><path d="M21 12a9 9 0 0 1-15 6l-2-2" /><path d="M5 8h5V3" /><path d="M19 16h-5v5" /></svg>;
   if (name === "salary") return <svg {...common}><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6" /></svg>;
+  if (name === "household") return <svg {...common}><path d="M3 10h18" /><path d="M5 10l1.5 9h11L19 10" /><path d="M8 10V6a4 4 0 0 1 8 0v4" /></svg>;
   if (name === "themes") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 3v18" /><path d="M3 12h18" /><path d="M5 5l14 14" /></svg>;
   if (name === "theme") return <svg {...common}><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg>;
   return <svg {...common}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>;
@@ -344,6 +374,23 @@ function App() {
   const [salaryPaying, setSalaryPaying] = useState(false);
   const [monthlyFreeAmountLoading, setMonthlyFreeAmountLoading] = useState(false);
   const [monthlyFreeAmountResult, setMonthlyFreeAmountResult] = useState<GetMonthlyFreeAmountResponse | null>(null);
+  const [householdBudgetLoading, setHouseholdBudgetLoading] = useState(false);
+  const [householdBudgetResult, setHouseholdBudgetResult] = useState<GetHouseholdBudgetSummaryResponse | null>(null);
+  const [householdSubTab, setHouseholdSubTab] = useState<HouseholdSubTab>("spend");
+  const [householdBudgetForm, setHouseholdBudgetForm] = useState<{
+    category: HouseholdBudgetCategory;
+    monthlyAmount: string;
+  }>({
+    category: "VEGETABLES",
+    monthlyAmount: ""
+  });
+  const [householdExpenseForm, setHouseholdExpenseForm] = useState<{
+    category: HouseholdBudgetCategory;
+    amount: string;
+  }>({
+    category: "VEGETABLES",
+    amount: ""
+  });
   const [recurringForm, setRecurringForm] = useState<{
     description: string;
     amount: string;
@@ -431,14 +478,16 @@ function App() {
           optionalList,
           fixedTotal,
           optionalTotal,
-          monthlyFreeAmount
+          monthlyFreeAmount,
+          householdBudgetSummary
         ] = await Promise.all([
           api.listDebtors(),
           api.listRecurringExpenses("FIXED"),
           api.listRecurringExpenses("OPTIONAL"),
           api.getRecurringExpenseTotal("FIXED"),
           api.getRecurringExpenseTotal("OPTIONAL"),
-          api.getMonthlyFreeAmount(getCurrentYear())
+          api.getMonthlyFreeAmount(getCurrentYear()),
+          api.getHouseholdBudgetSummary()
         ]);
 
         setDebtors(debtorsResponse.debtors);
@@ -451,6 +500,7 @@ function App() {
           OPTIONAL: optionalTotal.total
         });
         setMonthlyFreeAmountResult(monthlyFreeAmount);
+        setHouseholdBudgetResult(householdBudgetSummary);
 
         setDebtForm((current) => ({
           ...current,
@@ -777,6 +827,63 @@ function App() {
       setMonthlyFreeAmountResult(result);
     } finally {
       setMonthlyFreeAmountLoading(false);
+    }
+  }
+
+  async function loadHouseholdBudgetSummary() {
+    setHouseholdBudgetLoading(true);
+    try {
+      const result = await api.getHouseholdBudgetSummary();
+      setHouseholdBudgetResult(result);
+    } finally {
+      setHouseholdBudgetLoading(false);
+    }
+  }
+
+  async function handleConfigureHouseholdBudget(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+    try {
+      await api.configureHouseholdBudget({
+        category: householdBudgetForm.category,
+        monthlyAmount: parseAmountInput(householdBudgetForm.monthlyAmount)
+      });
+      await loadHouseholdBudgetSummary();
+      setHouseholdBudgetForm((current) => ({ ...current, monthlyAmount: "" }));
+      setNotice({ type: "success", text: "Presupuesto mensual actualizado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleRegisterHouseholdExpense(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+    try {
+      const amount = parseSignedAmountInput(householdExpenseForm.amount);
+      if (amount === 0) {
+        throw new Error("Ingresa un monto distinto de cero.");
+      }
+      await api.registerHouseholdExpense({
+        category: householdExpenseForm.category,
+        amount
+      });
+      await loadHouseholdBudgetSummary();
+      setHouseholdExpenseForm((current) => ({ ...current, amount: "" }));
+      setNotice({ type: "success", text: "Movimiento registrado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleResetHouseholdBudget(category: HouseholdBudgetCategory) {
+    setNotice(null);
+    try {
+      await api.resetHouseholdBudget(category);
+      await loadHouseholdBudgetSummary();
+      setNotice({ type: "success", text: `${getHouseholdCategoryLabel(category)} reiniciado al monto original.` });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
     }
   }
 
@@ -2025,6 +2132,189 @@ function App() {
                 ) : null}
               </div>
 
+            </Section>
+          )}
+
+          {activeTab === "household" && (
+            <Section
+              title="Verduras y mercadería"
+              description="Define monto original por categoría, descuenta gastos y reinicia cuando quieras al monto original."
+            >
+              <div className="household-subtabs" role="tablist" aria-label="Opciones de verduras y mercadería">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={householdSubTab === "spend"}
+                  className={householdSubTab === "spend" ? "household-subtab active" : "household-subtab"}
+                  onClick={() => setHouseholdSubTab("spend")}
+                >
+                  Resumen y gasto
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={householdSubTab === "settings"}
+                  className={householdSubTab === "settings" ? "household-subtab active" : "household-subtab"}
+                  onClick={() => setHouseholdSubTab("settings")}
+                >
+                  Configuración
+                </button>
+              </div>
+
+              {householdBudgetLoading ? <p className="muted">Actualizando resumen...</p> : null}
+
+              {householdSubTab === "spend" ? (
+                <>
+                  <div className="summary-row household-summary-row">
+                    {(householdBudgetResult?.budgets ?? []).map((item) => (
+                      <div
+                        className={`stat household-balance-card ${
+                          item.category === "VEGETABLES" ? "household-balance-vegetables" : "household-balance-groceries"
+                        }`}
+                        key={item.category}
+                      >
+                        <span className="household-category-label">
+                          <span className="household-category-icon" aria-hidden="true">
+                            {getHouseholdCategoryIcon(item.category)}
+                          </span>
+                          {getHouseholdCategoryLabel(item.category)}
+                        </span>
+                        <strong>{formatCurrency(item.remainingAmount)}</strong>
+                        <p className="muted">
+                          Presupuesto: {formatCurrency(item.monthlyAmount)} | Gastado: {formatCurrency(item.spentAmount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    className={`subpanel household-primary household-form-panel ${
+                      householdExpenseForm.category === "VEGETABLES"
+                        ? "household-form-panel-vegetables"
+                        : "household-form-panel-groceries"
+                    }`}
+                  >
+                    <h3>Registrar gasto</h3>
+                    <form className="form-grid compact" onSubmit={handleRegisterHouseholdExpense}>
+                      <label>
+                        Categoría
+                        <select
+                          value={householdExpenseForm.category}
+                          onChange={(event) =>
+                            setHouseholdExpenseForm((current) => ({
+                              ...current,
+                              category: event.target.value as HouseholdBudgetCategory
+                            }))
+                          }
+                        >
+                          <option value="VEGETABLES">🥦 Verduras</option>
+                          <option value="GROCERIES">🛒 Mercadería</option>
+                        </select>
+                      </label>
+                      <label>
+                        Monto gastado
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={householdExpenseForm.amount}
+                          onChange={(event) =>
+                            setHouseholdExpenseForm((current) => ({
+                              ...current,
+                              amount: formatSignedAmountInput(event.target.value)
+                            }))
+                          }
+                          placeholder="10000 o -10000"
+                          required
+                        />
+                      </label>
+                      <div className="form-actions">
+                        <button type="submit">Descontar gasto</button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <div className="household-settings-grid">
+                  <div
+                    className={`subpanel household-config-panel household-form-panel ${
+                      householdBudgetForm.category === "VEGETABLES"
+                        ? "household-form-panel-vegetables"
+                        : "household-form-panel-groceries"
+                    }`}
+                  >
+                    <h3>Configurar monto mensual</h3>
+                    <form className="form-grid compact" onSubmit={handleConfigureHouseholdBudget}>
+                      <label>
+                        Categoría
+                        <select
+                          value={householdBudgetForm.category}
+                          onChange={(event) =>
+                            setHouseholdBudgetForm((current) => ({
+                              ...current,
+                              category: event.target.value as HouseholdBudgetCategory
+                            }))
+                          }
+                        >
+                          <option value="VEGETABLES">🥦 Verduras</option>
+                          <option value="GROCERIES">🛒 Mercadería</option>
+                        </select>
+                      </label>
+                      <label>
+                        Monto mensual
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={householdBudgetForm.monthlyAmount}
+                          onChange={(event) =>
+                            setHouseholdBudgetForm((current) => ({
+                              ...current,
+                              monthlyAmount: formatAmountInput(event.target.value)
+                            }))
+                          }
+                          placeholder="120000"
+                          required
+                        />
+                      </label>
+                      <div className="form-actions">
+                        <button type="submit">Guardar presupuesto</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="subpanel household-reset-panel">
+                    <h3>Reset de saldos</h3>
+                    <ul className="list">
+                      {(householdBudgetResult?.budgets ?? []).map((item) => (
+                        <li
+                          className={`list-item household-reset-item ${
+                            item.category === "VEGETABLES" ? "household-reset-vegetables" : "household-reset-groceries"
+                          }`}
+                          key={`reset-${item.category}`}
+                        >
+                          <div>
+                            <p className="list-title household-category-label">
+                              <span className="household-category-icon" aria-hidden="true">
+                                {getHouseholdCategoryIcon(item.category)}
+                              </span>
+                              {getHouseholdCategoryLabel(item.category)}
+                            </p>
+                            <p className="muted">
+                              Actual: {formatCurrency(item.remainingAmount)} | Original: {formatCurrency(item.monthlyAmount)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => void handleResetHouseholdBudget(item.category)}
+                          >
+                            Reset
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </Section>
           )}
 

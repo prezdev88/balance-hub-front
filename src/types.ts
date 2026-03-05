@@ -1,4 +1,5 @@
 export type ExpenseType = "FIXED" | "OPTIONAL";
+export type HouseholdBudgetCategory = "VEGETABLES" | "GROCERIES";
 export type UserRole = "ADMIN" | "DEBTOR";
 
 export type ApiErrorResponse = {
@@ -97,6 +98,38 @@ export type UpdateRecurringExpenseResponse = {
   id: string;
   description: string;
   amount: string;
+};
+
+export type ConfigureHouseholdBudgetResponse = {
+  category: HouseholdBudgetCategory;
+  monthlyAmount: string;
+  remainingAmount: string;
+  updatedAt: string;
+};
+
+export type RegisterHouseholdExpenseResponse = {
+  category: HouseholdBudgetCategory;
+  consumedAmount: string;
+  remainingAmount: string;
+  updatedAt: string;
+};
+
+export type ResetHouseholdBudgetResponse = {
+  category: HouseholdBudgetCategory;
+  monthlyAmount: string;
+  remainingAmount: string;
+  updatedAt: string;
+};
+
+export type HouseholdBudgetSummaryItem = {
+  category: HouseholdBudgetCategory;
+  monthlyAmount: string;
+  spentAmount: string;
+  remainingAmount: string;
+};
+
+export type GetHouseholdBudgetSummaryResponse = {
+  budgets: HouseholdBudgetSummaryItem[];
 };
 
 export type CreateDebtResponse = {

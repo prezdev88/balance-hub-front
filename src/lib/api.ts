@@ -3,7 +3,9 @@ import type {
   CreateDebtResponse,
   CreateDebtorResponse,
   DebtorAccessResponse,
+  ConfigureHouseholdBudgetResponse,
   GetDebtDetailResponse,
+  GetHouseholdBudgetSummaryResponse,
   CreateRecurringExpenseResponse,
   CreateSavingsGoalResponse,
   CreateSalaryResponse,
@@ -17,6 +19,8 @@ import type {
   ListDebtorsResponse,
   ListRecurringExpensesResponse,
   RecurringExpensesTotalResponse,
+  RegisterHouseholdExpenseResponse,
+  ResetHouseholdBudgetResponse,
   UpdateRecurringExpenseResponse
 } from "../types";
 
@@ -167,6 +171,29 @@ export const api = {
   getRecurringExpenseTotal(type: ExpenseType) {
     const params = new URLSearchParams({ type });
     return request<RecurringExpensesTotalResponse>(`/api/recurring-expenses/total?${params.toString()}`);
+  },
+  getHouseholdBudgetSummary() {
+    return request<GetHouseholdBudgetSummaryResponse>("/api/household-budgets/summary");
+  },
+  configureHouseholdBudget(payload: { category: "VEGETABLES" | "GROCERIES"; monthlyAmount: number }) {
+    return request<ConfigureHouseholdBudgetResponse>(`/api/household-budgets/${payload.category}`, {
+      method: "PUT",
+      bodyJson: { monthlyAmount: payload.monthlyAmount }
+    });
+  },
+  registerHouseholdExpense(payload: {
+    category: "VEGETABLES" | "GROCERIES";
+    amount: number;
+  }) {
+    return request<RegisterHouseholdExpenseResponse>("/api/household-budgets/expenses", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  resetHouseholdBudget(category: "VEGETABLES" | "GROCERIES") {
+    return request<ResetHouseholdBudgetResponse>(`/api/household-budgets/${category}/reset`, {
+      method: "POST"
+    });
   },
   updateRecurringExpense(id: string, payload: { description: string; amount: number }) {
     return request<UpdateRecurringExpenseResponse>(`/api/recurring-expenses/${id}`, {
