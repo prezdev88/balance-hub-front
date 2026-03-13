@@ -6,12 +6,14 @@ import type {
   ConfigureHouseholdBudgetResponse,
   GetDebtDetailResponse,
   GetHouseholdBudgetSummaryResponse,
+  CreatePendingResponse,
   CreateRecurringExpenseResponse,
   CreateSavingsGoalResponse,
   CreateSalaryResponse,
   ExpenseType,
   GetMonthlyFreeAmountResponse,
   LoginResponse,
+  ListPendingsResponse,
   MonthlySummaryReportResponse,
   SalaryPreviewResponse,
   PayMonthlySalaryResponse,
@@ -162,6 +164,20 @@ export const api = {
     return request<CreateRecurringExpenseResponse>("/api/recurring-expenses", {
       method: "POST",
       bodyJson: payload
+    });
+  },
+  listPendings() {
+    return request<ListPendingsResponse>("/api/pendings");
+  },
+  createPending(payload: { description: string }) {
+    return request<CreatePendingResponse>("/api/pendings", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  deletePending(id: string) {
+    return request<void>(`/api/pendings/${id}`, {
+      method: "DELETE"
     });
   },
   listRecurringExpenses(type: ExpenseType) {

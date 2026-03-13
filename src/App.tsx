@@ -13,11 +13,12 @@ import type {
   GetMonthlyFreeAmountResponse,
   GetDebtDetailResponse,
   GetUnpaidInstallmentsByMonthResponse,
+  PendingItem,
   RecurringExpense,
   SalarySnapshot
 } from "./types";
 
-type TabKey = "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "household" | "themes";
+type TabKey = "debtors" | "debtorProfile" | "debts" | "pendings" | "recurring" | "salary" | "household" | "themes";
 type ThemeMode = "light" | "dark";
 type HouseholdSubTab = "spend" | "settings";
 type ThemeKey =
@@ -129,6 +130,7 @@ const THEME_OPTIONS: Array<{ key: ThemeKey; label: string; base: ThemeMode }> = 
 const ADMIN_TABS: Array<{ key: TabKey; label: string }> = [
   { key: "debtors", label: "Deudores" },
   { key: "debtorProfile", label: "Perfil deudor" },
+  { key: "pendings", label: "Pendientes" },
   { key: "recurring", label: "Gastos recurrentes" },
   { key: "salary", label: "Sueldos" },
   { key: "household", label: "Verduras y mercadería" },
@@ -303,13 +305,14 @@ function Section({
 function MobileMenuIcon({
   name
 }: {
-  name: "debtors" | "debtorProfile" | "debts" | "recurring" | "salary" | "household" | "themes" | "theme" | "logout";
+  name: "debtors" | "debtorProfile" | "debts" | "pendings" | "recurring" | "salary" | "household" | "themes" | "theme" | "logout";
 }) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 };
 
   if (name === "debtors") return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="M20 8v6" /><path d="M23 11h-6" /></svg>;
   if (name === "debtorProfile") return <svg {...common}><path d="M20 21a8 8 0 1 0-16 0" /><circle cx="12" cy="7" r="4" /></svg>;
   if (name === "debts") return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>;
+  if (name === "pendings") return <svg {...common}><path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>;
   if (name === "recurring") return <svg {...common}><path d="M3 12a9 9 0 0 1 15-6l2 2" /><path d="M21 12a9 9 0 0 1-15 6l-2-2" /><path d="M5 8h5V3" /><path d="M19 16h-5v5" /></svg>;
   if (name === "salary") return <svg {...common}><path d="M12 1v22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6" /></svg>;
   if (name === "household") return <svg {...common}><path d="M3 10h18" /><path d="M5 10l1.5 9h11L19 10" /><path d="M8 10V6a4 4 0 0 1 8 0v4" /></svg>;
@@ -337,6 +340,7 @@ function App() {
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
 
   const [debtors, setDebtors] = useState<Debtor[]>([]);
+  const [pendings, setPendings] = useState<PendingItem[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringState>(EMPTY_RECURRING);
   const [recurringTotals, setRecurringTotals] = useState<RecurringTotals>(EMPTY_TOTALS);
   const [pendingRecurringDelete, setPendingRecurringDelete] = useState<PendingRecurringDelete>(null);
@@ -401,6 +405,7 @@ function App() {
     type: "FIXED"
   });
   const [recurringSearch, setRecurringSearch] = useState("");
+  const [pendingForm, setPendingForm] = useState({ description: "" });
   const [recurringEditing, setRecurringEditing] = useState<{
     id: string;
     type: ExpenseType;
@@ -474,6 +479,7 @@ function App() {
         // Vercel rule async-parallel: fetch independent resources concurrently.
         const [
           debtorsResponse,
+          pendingsResponse,
           fixedList,
           optionalList,
           fixedTotal,
@@ -482,6 +488,7 @@ function App() {
           householdBudgetSummary
         ] = await Promise.all([
           api.listDebtors(),
+          api.listPendings(),
           api.listRecurringExpenses("FIXED"),
           api.listRecurringExpenses("OPTIONAL"),
           api.getRecurringExpenseTotal("FIXED"),
@@ -491,6 +498,7 @@ function App() {
         ]);
 
         setDebtors(debtorsResponse.debtors);
+        setPendings(pendingsResponse.pendings);
         setRecurringExpenses({
           FIXED: fixedList.recurringExpenses,
           OPTIONAL: optionalList.recurringExpenses
@@ -589,6 +597,11 @@ function App() {
     setRecurringTotals((current) => ({ ...current, [type]: totalResponse.total }));
   }
 
+  async function reloadPendings() {
+    const response = await api.listPendings();
+    setPendings(response.pendings);
+  }
+
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
     setNotice(null);
@@ -617,6 +630,7 @@ function App() {
     } finally {
       setSession(null);
       setDebtors([]);
+      setPendings([]);
       setRecurringExpenses(EMPTY_RECURRING);
       setRecurringTotals(EMPTY_TOTALS);
       setUnpaidByMonthResult(null);
@@ -763,6 +777,32 @@ function App() {
       await reloadRecurring(typeToRefresh);
       await loadMonthlyFreeAmount();
       setNotice({ type: "success", text: "Gasto recurrente creado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleCreatePending(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+    try {
+      await api.createPending({
+        description: pendingForm.description.trim()
+      });
+      setPendingForm({ description: "" });
+      await reloadPendings();
+      setNotice({ type: "success", text: "Pendiente creado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleCompletePending(id: string) {
+    setNotice(null);
+    try {
+      await api.deletePending(id);
+      await reloadPendings();
+      setNotice({ type: "success", text: "Pendiente marcado como listo." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
@@ -2509,6 +2549,58 @@ function App() {
                     </ul>
                   </div>
                 ))}
+              </div>
+            </Section>
+          )}
+
+          {activeTab === "pendings" && (
+            <Section
+              title="Pendientes"
+              description="Anota cosas por hacer y elimínalas al marcarlas como listas."
+            >
+              <form className="form-grid" onSubmit={handleCreatePending}>
+                <label>
+                  Nuevo pendiente
+                  <input
+                    value={pendingForm.description}
+                    onChange={(event) => setPendingForm({ description: event.target.value })}
+                    placeholder="Transferir compra del día"
+                    required
+                  />
+                </label>
+                <div className="form-actions">
+                  <button type="submit">Agregar pendiente</button>
+                </div>
+              </form>
+
+              <div className="subpanel">
+                <div className="subpanel-title">
+                  <h3>Lista activa</h3>
+                  <span className="muted">{pendings.length} pendientes</span>
+                </div>
+                <ul className="list">
+                  {pendings.length === 0 ? (
+                    <li className="list-item empty">No hay pendientes activos.</li>
+                  ) : (
+                    pendings.map((item) => (
+                      <li key={item.id} className="list-item pending-item">
+                        <div>
+                          <p className="list-title">{item.description}</p>
+                          <p className="muted">Creado: {formatDateTime(item.createdAt)}</p>
+                        </div>
+                        <div className="item-actions">
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => void handleCompletePending(item.id)}
+                          >
+                            Listo
+                          </button>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
               </div>
             </Section>
           )}

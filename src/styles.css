@@ -1053,6 +1053,10 @@ th {
   border-left: 4px solid #f59f3a;
 }
 
+.list-item.pending-item {
+  border-left: 4px solid #2b8a5a;
+}
+
 .list-item.empty {
   color: #607489;
 }

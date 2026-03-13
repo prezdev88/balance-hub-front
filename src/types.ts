@@ -82,6 +82,22 @@ export type RecurringExpense = {
   amount: string;
 };
 
+export type PendingItem = {
+  id: string;
+  description: string;
+  createdAt: string;
+};
+
+export type ListPendingsResponse = {
+  pendings: PendingItem[];
+};
+
+export type CreatePendingResponse = {
+  pendingId: string;
+  description: string;
+  createdAt: string;
+};
+
 export type ListRecurringExpensesResponse = {
   recurringExpenses: RecurringExpense[];
 };
