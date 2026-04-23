@@ -243,6 +243,17 @@ export const api = {
   getDebtDetail(debtId: string) {
     return request<GetDebtDetailResponse>(`/api/debts/${debtId}`);
   },
+  updateDebt(debtId: string, payload: {
+    description: string;
+    totalAmount: number;
+    installmentAmount: number;
+    createdAt: string;
+  }) {
+    return request<{ debtId: string }>(`/api/debts/${debtId}`, {
+      method: "PUT",
+      bodyJson: payload
+    });
+  },
   payInstallment(installmentId: string, payload: { paymentDate: string }) {
     return request<void>(`/api/installments/${installmentId}/pay`, {
       method: "PATCH",

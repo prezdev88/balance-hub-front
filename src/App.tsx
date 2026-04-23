@@ -15,7 +15,8 @@ import type {
   GetUnpaidInstallmentsByMonthResponse,
   PendingItem,
   RecurringExpense,
-  SalarySnapshot
+  SalarySnapshot,
+  UpdateDebtRequest
 } from "./types";
 
 type TabKey = "debtors" | "debtorProfile" | "debts" | "pendings" | "recurring" | "salary" | "household" | "themes";
@@ -76,6 +77,13 @@ type DebtDetailModalState = {
   debtorName: string;
   debtorEmail: string;
   debtId: string;
+} | null;
+
+type DebtEditState = {
+  debt: Debt;
+  debtorId: string;
+  debtorName: string;
+  debtorEmail: string;
 } | null;
 
 type DebtCreationDebtorContext = {
@@ -356,6 +364,8 @@ function App() {
   const [debtDetailLoading, setDebtDetailLoading] = useState(false);
   const [debtDetail, setDebtDetail] = useState<Debt | null>(null);
   const [debtDetailPage, setDebtDetailPage] = useState(1);
+  const [debtEditModal, setDebtEditModal] = useState<DebtEditState>(null);
+  const [debtEditConfirmModal, setDebtEditConfirmModal] = useState<DebtEditState>(null);
   const [debtCreationDebtorContext, setDebtCreationDebtorContext] = useState<DebtCreationDebtorContext>(null);
   const [createDebtorModalOpen, setCreateDebtorModalOpen] = useState(false);
 
@@ -975,6 +985,67 @@ function App() {
           void loadDebtDetail(debtDetailModal);
         });
       }
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleUpdateDebt() {
+    setNotice(null);
+    if (!debtEditModal) return;
+
+    const installmentAmount = parseAmountInput(debtEditModal.debt.installments[0]?.amount?.toString() || "0");
+    const createdAt = debtEditModal.debt.createdAt;
+
+    const payload: UpdateDebtRequest = {
+      description: debtEditModal.debt.description,
+      totalAmount: parseAmountInput(debtEditModal.debt.totalAmount.toString()),
+      installmentAmount,
+      createdAt
+    };
+
+    try {
+      await api.updateDebt(debtEditModal.debt.id, payload);
+      setNotice({ type: "success", text: "Deuda actualizada correctamente." });
+      setDebtEditModal(null);
+      setDebtEditConfirmModal(null);
+
+      if (debtDetailModal) {
+        await loadDebtDetail(debtDetailModal);
+      }
+      await reloadDebtors();
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function confirmUpdateDebt() {
+    if (!debtEditConfirmModal) return;
+    if (!debtEditModal) {
+      setDebtEditConfirmModal(null);
+      return;
+    }
+
+    const installmentAmount = parseAmountInput(debtEditConfirmModal.debt.installments[0]?.amount?.toString() || "0");
+    const createdAt = debtEditConfirmModal.debt.createdAt?.slice(0, 10) || "";
+
+    const payload: UpdateDebtRequest = {
+      description: debtEditConfirmModal.debt.description,
+      totalAmount: parseAmountInput(debtEditConfirmModal.debt.totalAmount.toString()),
+      installmentAmount,
+      createdAt
+    };
+
+    try {
+      await api.updateDebt(debtEditConfirmModal.debt.id, payload);
+      setNotice({ type: "success", text: "Deuda actualizada correctamente." });
+      setDebtEditModal(null);
+      setDebtEditConfirmModal(null);
+
+      if (debtDetailModal) {
+        await loadDebtDetail(debtDetailModal);
+      }
+      await reloadDebtors();
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
@@ -1657,19 +1728,41 @@ function App() {
                         {debtDetail.settled ? "Saldada" : "Pendiente"}
                       </span>
                       {isAdmin && !debtDetail.settled ? (
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => {
-                            setDebtDetailModal(null);
-                            setPendingDebtDelete({
-                              debtId: debtDetail.id,
-                              debtDescription: debtDetail.description
-                            });
-                          }}
-                        >
-                          Eliminar deuda
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDebtEditModal({
+                                debt: {
+                                  ...debtDetail,
+                                  totalAmount: formatAmountInput(String(debtDetail.totalAmount)),
+                                  installments: debtDetail.installments.map((inst) => ({
+                                    ...inst,
+                                    amount: formatAmountInput(String(inst.amount))
+                                  }))
+                                },
+                                debtorId: debtDetailModal.debtorId,
+                                debtorName: debtDetailModal.debtorName,
+                                debtorEmail: debtDetailModal.debtorEmail
+                              });
+                            }}
+                          >
+                            Editar deuda
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => {
+                              setDebtDetailModal(null);
+                              setPendingDebtDelete({
+                                debtId: debtDetail.id,
+                                debtDescription: debtDetail.description
+                              });
+                            }}
+                          >
+                            Eliminar deuda
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </div>
@@ -1752,6 +1845,76 @@ function App() {
               <button type="button" className="secondary" onClick={() => setDebtDetailModal(null)}>
                 Cerrar
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {debtEditModal ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setDebtEditModal(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="edit-debt-title" onClick={(e) => e.stopPropagation()}>
+            <form className="form-grid" onSubmit={(e) => { e.preventDefault(); setDebtEditConfirmModal({ debt: { ...debtEditModal.debt }, debtorId: debtEditModal.debtorId, debtorName: debtEditModal.debtorName, debtorEmail: debtEditModal.debtorEmail }); }}>
+              <h3 id="edit-debt-title">Editar Deuda</h3>
+              <label>
+                Descripcion
+                <input
+                  type="text"
+                  value={debtEditModal.debt.description}
+                  onChange={(e) => setDebtEditModal({ ...debtEditModal, debt: { ...debtEditModal.debt, description: e.target.value } })}
+                  required
+                />
+              </label>
+              <label>
+                Monto Total
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={debtEditModal.debt.totalAmount}
+                  onChange={(e) => setDebtEditModal({ ...debtEditModal, debt: { ...debtEditModal.debt, totalAmount: formatAmountInput(e.target.value) } })}
+                  required
+                />
+              </label>
+              <label>
+                Monto Cuota
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={debtEditModal.debt.installments[0]?.amount || "0"}
+                  onChange={(e) => { const v = formatAmountInput(e.target.value); setDebtEditModal({ ...debtEditModal, debt: { ...debtEditModal.debt, installments: debtEditModal.debt.installments.map((inst) => ({ ...inst, amount: v })) } }); }}
+                  required
+                />
+              </label>
+              <label>
+                Fecha Creacion
+                <input
+                  type="date"
+                  value={debtEditModal.debt.createdAt ? debtEditModal.debt.createdAt.slice(0, 10) : ""}
+                  onChange={(e) => { const v = e.target.value; setDebtEditModal({ ...debtEditModal, debt: { ...debtEditModal.debt, createdAt: v } }); }}
+                  required
+                />
+              </label>
+              <div className="form-actions split">
+                <button type="submit">Guardar</button>
+                <button type="button" className="secondary" onClick={() => setDebtEditModal(null)}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {debtEditConfirmModal ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setDebtEditConfirmModal(null)}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-edit-debt-title" onClick={(e) => e.stopPropagation()}>
+            <h3 id="confirm-edit-debt-title">Confirmar Cambios</h3>
+            <div className="confirm-changes">
+              <p><strong>Descripcion:</strong> {debtEditConfirmModal.debt.description}</p>
+              <p><strong>Monto Total:</strong> {formatCurrency(debtEditConfirmModal.debt.totalAmount)}</p>
+              <p><strong>Monto Cuota:</strong> {formatCurrency(debtEditConfirmModal.debt.installments[0]?.amount || 0)}</p>
+              <p><strong>Fecha Creacion:</strong> {formatDate(debtEditConfirmModal.debt.createdAt)}</p>
+            </div>
+            <div className="form-actions split">
+              <button type="button" onClick={() => confirmUpdateDebt()}>Confirmar</button>
+              <button type="button" className="secondary" onClick={() => setDebtEditConfirmModal(null)}>Cancelar</button>
             </div>
           </div>
         </div>

@@ -198,6 +198,13 @@ export type GetDebtDetailResponse = {
   debt: Debt;
 };
 
+export type UpdateDebtRequest = {
+  description: string;
+  totalAmount: number;
+  installmentAmount: number;
+  createdAt: string;
+};
+
 export type LoginResponse = {
   accessToken: string;
   tokenType: string;
