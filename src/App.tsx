@@ -2155,9 +2155,9 @@ function App() {
                         type="button"
                         className="salary-pay-btn"
                         onClick={requestPayMonthlySalary}
-                        disabled={salaryPaying || salarySnapshotLoading}
+                        disabled={salaryPaying || salarySnapshotLoading || salarySnapshot?.status === "PAID"}
                       >
-                        {salaryPaying ? "Pagando..." : "✓ Pagar sueldo"}
+                        {salaryPaying ? "Pagando..." : salarySnapshot?.status === "PAID" ? "Sueldo pagado" : "✓ Pagar sueldo"}
                       </button>
                     ) : null}
                     <button
