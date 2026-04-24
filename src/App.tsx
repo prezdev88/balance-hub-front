@@ -2217,7 +2217,7 @@ function App() {
                             </td>
                             <td data-label="Sueldo">{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
                             <td data-label="Acción">
-                              {item.paid || !isAdmin ? (
+                              {item.paid || !isAdmin || !salarySnapshot || salarySnapshot.status !== "PAID" ? (
                                 <span className="muted">Sin acción</span>
                               ) : (
                                 <button
