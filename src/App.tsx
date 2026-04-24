@@ -1908,8 +1908,8 @@ function App() {
             <h3 id="confirm-edit-debt-title">Confirmar Cambios</h3>
             <div className="confirm-changes">
               <p><strong>Descripcion:</strong> {debtEditConfirmModal.debt.description}</p>
-              <p><strong>Monto Total:</strong> {formatCurrency(debtEditConfirmModal.debt.totalAmount)}</p>
-              <p><strong>Monto Cuota:</strong> {formatCurrency(debtEditConfirmModal.debt.installments[0]?.amount || 0)}</p>
+              <p><strong>Monto Total:</strong> {formatCurrency(parseAmountInput(String(debtEditConfirmModal.debt.totalAmount)))}</p>
+              <p><strong>Monto Cuota:</strong> {formatCurrency(parseAmountInput(String(debtEditConfirmModal.debt.installments[0]?.amount || 0)))}</p>
               <p><strong>Fecha Creacion:</strong> {formatDate(debtEditConfirmModal.debt.createdAt)}</p>
             </div>
             <div className="form-actions split">
