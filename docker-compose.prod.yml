@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile
     image: balance-hub-front:prod
     restart: unless-stopped
-    ports:
-      - "5173:80"
+    expose:
+      - "80"
     networks:
       - balance-hub-front-net
       - balance-hub-net
