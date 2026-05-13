@@ -4,8 +4,9 @@ import { ApiClientError, api } from "./lib/api";
 import { generateMonthlySummaryPdfBlob } from "./lib/monthlySummaryPdf";
 import type {
   DebtorAccessResponse,
-  GetHouseholdBudgetSummaryResponse,
   HouseholdBudgetCategory,
+  HouseholdBag,
+  ListHouseholdBagsResponse,
   LoginResponse,
   Debt,
   Debtor,
@@ -141,7 +142,7 @@ const ADMIN_TABS: Array<{ key: TabKey; label: string }> = [
   { key: "pendings", label: "Pendientes" },
   { key: "recurring", label: "Gastos recurrentes" },
   { key: "salary", label: "Sueldos" },
-  { key: "household", label: "Verduras y mercadería" },
+  { key: "household", label: "Bolsas" },
   { key: "themes", label: "Temas" }
 ];
 const DEBTOR_TABS: Array<{ key: TabKey; label: string }> = [
@@ -249,12 +250,11 @@ function getMonthLabel(month: number): string {
   return MONTH_OPTIONS.find((item) => item.value === month)?.label.toLowerCase() ?? String(month);
 }
 
-function getHouseholdCategoryLabel(category: HouseholdBudgetCategory): string {
-  return category === "VEGETABLES" ? "Verduras" : "Mercadería";
-}
-
-function getHouseholdCategoryIcon(category: HouseholdBudgetCategory): string {
-  return category === "VEGETABLES" ? "🥦" : "🛒";
+function getHouseholdBagLabel(name: string, emoji: string): string {
+  const normalizedEmoji = emoji.trim();
+  const normalizedName = name.trim();
+  if (!normalizedEmoji) return normalizedName;
+  return `${normalizedEmoji} ${normalizedName}`;
 }
 
 function normalizeEmail(value: string): string {
@@ -389,20 +389,20 @@ function App() {
   const [monthlyFreeAmountLoading, setMonthlyFreeAmountLoading] = useState(false);
   const [monthlyFreeAmountResult, setMonthlyFreeAmountResult] = useState<GetMonthlyFreeAmountResponse | null>(null);
   const [householdBudgetLoading, setHouseholdBudgetLoading] = useState(false);
-  const [householdBudgetResult, setHouseholdBudgetResult] = useState<GetHouseholdBudgetSummaryResponse | null>(null);
+  const [householdBudgetResult, setHouseholdBudgetResult] = useState<ListHouseholdBagsResponse | null>(null);
   const [householdSubTab, setHouseholdSubTab] = useState<HouseholdSubTab>("spend");
   const [householdBudgetForm, setHouseholdBudgetForm] = useState<{
-    category: HouseholdBudgetCategory;
+    bagId: string;
     monthlyAmount: string;
   }>({
-    category: "VEGETABLES",
+    bagId: "",
     monthlyAmount: ""
   });
   const [householdExpenseForm, setHouseholdExpenseForm] = useState<{
-    category: HouseholdBudgetCategory;
+    bagId: string;
     amount: string;
   }>({
-    category: "VEGETABLES",
+    bagId: "",
     amount: ""
   });
   const [recurringForm, setRecurringForm] = useState<{
@@ -495,7 +495,7 @@ function App() {
           fixedTotal,
           optionalTotal,
           monthlyFreeAmount,
-          householdBudgetSummary
+          householdBags
         ] = await Promise.all([
           api.listDebtors(),
           api.listPendings(),
@@ -504,7 +504,7 @@ function App() {
           api.getRecurringExpenseTotal("FIXED"),
           api.getRecurringExpenseTotal("OPTIONAL"),
           api.getMonthlyFreeAmount(getCurrentYear()),
-          api.getHouseholdBudgetSummary()
+          api.listHouseholdBags()
         ]);
 
         setDebtors(debtorsResponse.debtors);
@@ -518,7 +518,7 @@ function App() {
           OPTIONAL: optionalTotal.total
         });
         setMonthlyFreeAmountResult(monthlyFreeAmount);
-        setHouseholdBudgetResult(householdBudgetSummary);
+        applyHouseholdBagsResult(householdBags);
 
         setDebtForm((current) => ({
           ...current,
@@ -883,8 +883,8 @@ function App() {
   async function loadHouseholdBudgetSummary() {
     setHouseholdBudgetLoading(true);
     try {
-      const result = await api.getHouseholdBudgetSummary();
-      setHouseholdBudgetResult(result);
+      const result = await api.listHouseholdBags();
+      applyHouseholdBagsResult(result);
     } finally {
       setHouseholdBudgetLoading(false);
     }
@@ -894,8 +894,8 @@ function App() {
     event.preventDefault();
     setNotice(null);
     try {
-      await api.configureHouseholdBudget({
-        category: householdBudgetForm.category,
+      await api.updateHouseholdBagBudget({
+        bagId: householdBudgetForm.bagId,
         monthlyAmount: parseAmountInput(householdBudgetForm.monthlyAmount)
       });
       await loadHouseholdBudgetSummary();
@@ -914,8 +914,8 @@ function App() {
       if (amount === 0) {
         throw new Error("Ingresa un monto distinto de cero.");
       }
-      await api.registerHouseholdExpense({
-        category: householdExpenseForm.category,
+      await api.registerHouseholdBagMovement({
+        bagId: householdExpenseForm.bagId,
         amount
       });
       await loadHouseholdBudgetSummary();
@@ -926,15 +926,36 @@ function App() {
     }
   }
 
-  async function handleResetHouseholdBudget(category: HouseholdBudgetCategory) {
+  async function handleResetHouseholdBudget(bagId: string) {
     setNotice(null);
     try {
-      await api.resetHouseholdBudget(category);
+      await api.resetHouseholdBag(bagId);
       await loadHouseholdBudgetSummary();
-      setNotice({ type: "success", text: `${getHouseholdCategoryLabel(category)} reiniciado al monto original.` });
+      const bagName = getHouseholdBagName(bagId);
+      setNotice({ type: "success", text: `${bagName} reiniciada al monto original.` });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
+  }
+
+  function applyHouseholdBagsResult(result: ListHouseholdBagsResponse) {
+    setHouseholdBudgetResult(result);
+    const defaultBagId = result.bags[0]?.id ?? "";
+
+    setHouseholdBudgetForm((current) => ({
+      ...current,
+      bagId: result.bags.some((bag: HouseholdBag) => bag.id === current.bagId) ? current.bagId : defaultBagId
+    }));
+
+    setHouseholdExpenseForm((current) => ({
+      ...current,
+      bagId: result.bags.some((bag: HouseholdBag) => bag.id === current.bagId) ? current.bagId : defaultBagId
+    }));
+  }
+
+  function getHouseholdBagName(bagId: string): string {
+    const bag = householdBudgetResult?.bags.find((item: HouseholdBag) => item.id === bagId);
+    return bag?.name ?? "Bolsa";
   }
 
   async function handleCreateDebt(event: React.FormEvent) {
@@ -2340,10 +2361,10 @@ function App() {
 
           {activeTab === "household" && (
             <Section
-              title="Verduras y mercadería"
-              description="Define monto original por categoría, descuenta gastos y reinicia cuando quieras al monto original."
+              title="Bolsas"
+              description="Revisa cada bolsa, registra gastos o ajustes y actualiza su presupuesto mensual cuando lo necesites."
             >
-              <div className="household-subtabs" role="tablist" aria-label="Opciones de verduras y mercadería">
+              <div className="household-subtabs" role="tablist" aria-label="Opciones de bolsas">
                 <button
                   type="button"
                   role="tab"
@@ -2369,18 +2390,10 @@ function App() {
               {householdSubTab === "spend" ? (
                 <>
                   <div className="summary-row household-summary-row">
-                    {(householdBudgetResult?.budgets ?? []).map((item) => (
-                      <div
-                        className={`stat household-balance-card ${
-                          item.category === "VEGETABLES" ? "household-balance-vegetables" : "household-balance-groceries"
-                        }`}
-                        key={item.category}
-                      >
+                    {(householdBudgetResult?.bags ?? []).map((item) => (
+                      <div className="stat household-balance-card" key={item.id}>
                         <span className="household-category-label">
-                          <span className="household-category-icon" aria-hidden="true">
-                            {getHouseholdCategoryIcon(item.category)}
-                          </span>
-                          {getHouseholdCategoryLabel(item.category)}
+                          {getHouseholdBagLabel(item.name, item.emoji)}
                         </span>
                         <strong>{formatCurrency(item.remainingAmount)}</strong>
                         <p className="muted">
@@ -2390,28 +2403,25 @@ function App() {
                     ))}
                   </div>
 
-                  <div
-                    className={`subpanel household-primary household-form-panel ${
-                      householdExpenseForm.category === "VEGETABLES"
-                        ? "household-form-panel-vegetables"
-                        : "household-form-panel-groceries"
-                    }`}
-                  >
+                  <div className="subpanel household-primary household-form-panel">
                     <h3>Registrar gasto</h3>
                     <form className="form-grid compact" onSubmit={handleRegisterHouseholdExpense}>
                       <label>
-                        Categoría
+                        Bolsa
                         <select
-                          value={householdExpenseForm.category}
+                          value={householdExpenseForm.bagId}
                           onChange={(event) =>
                             setHouseholdExpenseForm((current) => ({
                               ...current,
-                              category: event.target.value as HouseholdBudgetCategory
+                              bagId: event.target.value
                             }))
                           }
                         >
-                          <option value="VEGETABLES">🥦 Verduras</option>
-                          <option value="GROCERIES">🛒 Mercadería</option>
+                          {(householdBudgetResult?.bags ?? []).map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {getHouseholdBagLabel(item.name, item.emoji)}
+                            </option>
+                          ))}
                         </select>
                       </label>
                       <label>
@@ -2438,28 +2448,25 @@ function App() {
                 </>
               ) : (
                 <div className="household-settings-grid">
-                  <div
-                    className={`subpanel household-config-panel household-form-panel ${
-                      householdBudgetForm.category === "VEGETABLES"
-                        ? "household-form-panel-vegetables"
-                        : "household-form-panel-groceries"
-                    }`}
-                  >
+                  <div className="subpanel household-config-panel household-form-panel">
                     <h3>Configurar monto mensual</h3>
                     <form className="form-grid compact" onSubmit={handleConfigureHouseholdBudget}>
                       <label>
-                        Categoría
+                        Bolsa
                         <select
-                          value={householdBudgetForm.category}
+                          value={householdBudgetForm.bagId}
                           onChange={(event) =>
                             setHouseholdBudgetForm((current) => ({
                               ...current,
-                              category: event.target.value as HouseholdBudgetCategory
+                              bagId: event.target.value
                             }))
                           }
                         >
-                          <option value="VEGETABLES">🥦 Verduras</option>
-                          <option value="GROCERIES">🛒 Mercadería</option>
+                          {(householdBudgetResult?.bags ?? []).map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {getHouseholdBagLabel(item.name, item.emoji)}
+                            </option>
+                          ))}
                         </select>
                       </label>
                       <label>
@@ -2487,19 +2494,11 @@ function App() {
                   <div className="subpanel household-reset-panel">
                     <h3>Reset de saldos</h3>
                     <ul className="list">
-                      {(householdBudgetResult?.budgets ?? []).map((item) => (
-                        <li
-                          className={`list-item household-reset-item ${
-                            item.category === "VEGETABLES" ? "household-reset-vegetables" : "household-reset-groceries"
-                          }`}
-                          key={`reset-${item.category}`}
-                        >
+                      {(householdBudgetResult?.bags ?? []).map((item) => (
+                        <li className="list-item household-reset-item" key={`reset-${item.id}`}>
                           <div>
                             <p className="list-title household-category-label">
-                              <span className="household-category-icon" aria-hidden="true">
-                                {getHouseholdCategoryIcon(item.category)}
-                              </span>
-                              {getHouseholdCategoryLabel(item.category)}
+                              {getHouseholdBagLabel(item.name, item.emoji)}
                             </p>
                             <p className="muted">
                               Actual: {formatCurrency(item.remainingAmount)} | Original: {formatCurrency(item.monthlyAmount)}
@@ -2508,7 +2507,7 @@ function App() {
                           <button
                             type="button"
                             className="secondary"
-                            onClick={() => void handleResetHouseholdBudget(item.category)}
+                            onClick={() => void handleResetHouseholdBudget(item.id)}
                           >
                             Reset
                           </button>

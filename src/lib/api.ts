@@ -2,10 +2,12 @@ import type {
   ApiErrorResponse,
   CreateDebtResponse,
   CreateDebtorResponse,
+  CreateHouseholdBagResponse,
   DebtorAccessResponse,
   ConfigureHouseholdBudgetResponse,
   GetDebtDetailResponse,
   GetHouseholdBudgetSummaryResponse,
+  ListHouseholdBagsResponse,
   CreatePendingResponse,
   CreateRecurringExpenseResponse,
   CreateSavingsGoalResponse,
@@ -21,8 +23,11 @@ import type {
   ListDebtorsResponse,
   ListRecurringExpensesResponse,
   RecurringExpensesTotalResponse,
+  RegisterHouseholdBagMovementResponse,
   RegisterHouseholdExpenseResponse,
+  ResetHouseholdBagResponse,
   ResetHouseholdBudgetResponse,
+  UpdateHouseholdBagBudgetResponse,
   UpdateRecurringExpenseResponse
 } from "../types";
 
@@ -187,6 +192,35 @@ export const api = {
   getRecurringExpenseTotal(type: ExpenseType) {
     const params = new URLSearchParams({ type });
     return request<RecurringExpensesTotalResponse>(`/api/recurring-expenses/total?${params.toString()}`);
+  },
+  listHouseholdBags() {
+    return request<ListHouseholdBagsResponse>("/api/household-budgets");
+  },
+  createHouseholdBag(payload: { name: string; emoji: string; monthlyAmount: number }) {
+    return request<CreateHouseholdBagResponse>("/api/household-budgets", {
+      method: "POST",
+      bodyJson: payload
+    });
+  },
+  updateHouseholdBagBudget(payload: { bagId: string; monthlyAmount: number }) {
+    return request<UpdateHouseholdBagBudgetResponse>(`/api/household-budgets/${payload.bagId}/budget`, {
+      method: "PUT",
+      bodyJson: { monthlyAmount: payload.monthlyAmount }
+    });
+  },
+  registerHouseholdBagMovement(payload: {
+    bagId: string;
+    amount: number;
+  }) {
+    return request<RegisterHouseholdBagMovementResponse>(`/api/household-budgets/${payload.bagId}/movements`, {
+      method: "POST",
+      bodyJson: { amount: payload.amount }
+    });
+  },
+  resetHouseholdBag(bagId: string) {
+    return request<ResetHouseholdBagResponse>(`/api/household-budgets/${bagId}/reset`, {
+      method: "POST"
+    });
   },
   getHouseholdBudgetSummary() {
     return request<GetHouseholdBudgetSummaryResponse>("/api/household-budgets/summary");

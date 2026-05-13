@@ -927,22 +927,13 @@ th {
   margin-top: 0.4rem;
 }
 
-.household-balance-vegetables {
-  background: #edf8f1;
-  border-color: rgba(28, 140, 71, 0.35);
+.household-balance-card {
+  background: linear-gradient(180deg, rgba(49, 130, 206, 0.08), rgba(16, 24, 40, 0.01)), #f8fbff;
+  border-color: rgba(49, 130, 206, 0.24);
 }
 
-.household-balance-vegetables strong {
-  color: #1f7a43;
-}
-
-.household-balance-groceries {
-  background: #fff2ea;
-  border-color: rgba(180, 84, 26, 0.35);
-}
-
-.household-balance-groceries strong {
-  color: #b4541a;
+.household-balance-card strong {
+  color: #215f9a;
 }
 
 .household-category-label {
@@ -966,28 +957,18 @@ th {
   border-width: 2px;
 }
 
-.household-form-panel-vegetables {
-  background: #edf8f1;
-  border-color: rgba(28, 140, 71, 0.35);
-}
-
-.household-form-panel-groceries {
-  background: #fff2ea;
-  border-color: rgba(180, 84, 26, 0.35);
+.household-form-panel {
+  background: linear-gradient(180deg, rgba(49, 130, 206, 0.08), transparent), #fcfdff;
+  border-color: rgba(49, 130, 206, 0.24);
 }
 
 .household-reset-item {
   border-width: 2px;
 }
 
-.household-reset-vegetables {
-  background: #edf8f1;
-  border-color: rgba(28, 140, 71, 0.35);
-}
-
-.household-reset-groceries {
-  background: #fff2ea;
-  border-color: rgba(180, 84, 26, 0.35);
+.household-reset-item {
+  background: linear-gradient(180deg, rgba(49, 130, 206, 0.05), transparent), #fcfdff;
+  border-color: rgba(49, 130, 206, 0.2);
 }
 
 .subpanel {

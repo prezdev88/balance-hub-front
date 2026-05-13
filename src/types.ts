@@ -116,6 +116,43 @@ export type UpdateRecurringExpenseResponse = {
   amount: string;
 };
 
+export type HouseholdBag = {
+  id: string;
+  name: string;
+  emoji: string;
+  monthlyAmount: string;
+  spentAmount: string;
+  remainingAmount: string;
+  updatedAt: string;
+};
+
+export type ListHouseholdBagsResponse = {
+  bags: HouseholdBag[];
+};
+
+export type CreateHouseholdBagResponse = {
+  bag: HouseholdBag;
+};
+
+export type UpdateHouseholdBagBudgetResponse = {
+  bag: HouseholdBag;
+};
+
+export type RegisterHouseholdBagMovementResponse = {
+  bagId: string;
+  amount: string;
+  movementType: "EXPENSE" | "ADJUSTMENT" | "RESET";
+  remainingAmount: string;
+  updatedAt: string;
+};
+
+export type ResetHouseholdBagResponse = {
+  bagId: string;
+  monthlyAmount: string;
+  remainingAmount: string;
+  updatedAt: string;
+};
+
 export type ConfigureHouseholdBudgetResponse = {
   category: HouseholdBudgetCategory;
   monthlyAmount: string;
