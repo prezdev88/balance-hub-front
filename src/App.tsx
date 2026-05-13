@@ -398,6 +398,15 @@ function App() {
     bagId: "",
     monthlyAmount: ""
   });
+  const [householdCreateForm, setHouseholdCreateForm] = useState<{
+    name: string;
+    emoji: string;
+    monthlyAmount: string;
+  }>({
+    name: "",
+    emoji: "",
+    monthlyAmount: ""
+  });
   const [householdExpenseForm, setHouseholdExpenseForm] = useState<{
     bagId: string;
     amount: string;
@@ -901,6 +910,27 @@ function App() {
       await loadHouseholdBudgetSummary();
       setHouseholdBudgetForm((current) => ({ ...current, monthlyAmount: "" }));
       setNotice({ type: "success", text: "Presupuesto mensual actualizado." });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleCreateHouseholdBag(event: React.FormEvent) {
+    event.preventDefault();
+    setNotice(null);
+    try {
+      await api.createHouseholdBag({
+        name: householdCreateForm.name.trim(),
+        emoji: householdCreateForm.emoji.trim(),
+        monthlyAmount: parseAmountInput(householdCreateForm.monthlyAmount)
+      });
+      await loadHouseholdBudgetSummary();
+      setHouseholdCreateForm({
+        name: "",
+        emoji: "",
+        monthlyAmount: ""
+      });
+      setNotice({ type: "success", text: "Bolsa creada correctamente." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
@@ -2487,6 +2517,61 @@ function App() {
                       </label>
                       <div className="form-actions">
                         <button type="submit">Guardar presupuesto</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="subpanel household-config-panel household-form-panel">
+                    <h3>Crear bolsa</h3>
+                    <form className="form-grid compact" onSubmit={handleCreateHouseholdBag}>
+                      <label>
+                        Nombre
+                        <input
+                          type="text"
+                          value={householdCreateForm.name}
+                          onChange={(event) =>
+                            setHouseholdCreateForm((current) => ({
+                              ...current,
+                              name: event.target.value
+                            }))
+                          }
+                          placeholder="Ej. Transporte"
+                          required
+                        />
+                      </label>
+                      <label>
+                        Emoji
+                        <input
+                          type="text"
+                          value={householdCreateForm.emoji}
+                          onChange={(event) =>
+                            setHouseholdCreateForm((current) => ({
+                              ...current,
+                              emoji: event.target.value
+                            }))
+                          }
+                          placeholder="🚕"
+                          required
+                        />
+                      </label>
+                      <label>
+                        Presupuesto mensual
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={householdCreateForm.monthlyAmount}
+                          onChange={(event) =>
+                            setHouseholdCreateForm((current) => ({
+                              ...current,
+                              monthlyAmount: formatAmountInput(event.target.value)
+                            }))
+                          }
+                          placeholder="90000"
+                          required
+                        />
+                      </label>
+                      <div className="form-actions">
+                        <button type="submit">Crear bolsa</button>
                       </div>
                     </form>
                   </div>
