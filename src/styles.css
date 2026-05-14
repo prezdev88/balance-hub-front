@@ -769,6 +769,10 @@ button:disabled {
   overflow: auto;
 }
 
+.table-wrap.scrollable-md {
+  max-height: 400px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -795,7 +799,12 @@ th {
 }
 
 .muted {
-  color: #607489;
+  opacity: 0.6;
+  font-size: 0.9em;
+}
+
+.text-danger {
+  color: #e53e3e;
 }
 
 .info-card {
@@ -1471,8 +1480,8 @@ th {
   }
 
   .pagination-controls {
-    justify-content: space-between;
-    flex-wrap: wrap;
+    justify-content: center;
+    flex-wrap: nowrap;
   }
 
   .table-wrap {

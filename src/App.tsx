@@ -4,6 +4,7 @@ import { ApiClientError, api } from "./lib/api";
 import { generateMonthlySummaryPdfBlob } from "./lib/monthlySummaryPdf";
 import type {
   DebtorAccessResponse,
+  GetHouseholdBagMovementHistoryResponse,
   HouseholdBudgetCategory,
   HouseholdBag,
   ListHouseholdBagsResponse,
@@ -257,6 +258,23 @@ function getHouseholdBagLabel(name: string, emoji: string): string {
   return `${normalizedEmoji} ${normalizedName}`;
 }
 
+function getMovementTypeLabel(type: "EXPENSE" | "ADJUSTMENT" | "RESET"): string {
+  switch (type) {
+    case "EXPENSE": return "Gasto";
+    case "ADJUSTMENT": return "Ajuste";
+    case "RESET": return "Reinicio";
+  }
+}
+
+function getMovementAmount(value: string, type: "EXPENSE" | "ADJUSTMENT" | "RESET"): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  if (type === "EXPENSE") {
+    return `-${formatCurrency(Math.abs(numeric))}`;
+  }
+  return formatCurrency(numeric);
+}
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -414,6 +432,12 @@ function App() {
     bagId: "",
     amount: ""
   });
+  const [householdHistoryModal, setHouseholdHistoryModal] = useState<{
+    bagId: string;
+    bagName: string;
+  } | null>(null);
+  const [householdHistoryLoading, setHouseholdHistoryLoading] = useState(false);
+  const [householdHistoryData, setHouseholdHistoryData] = useState<GetHouseholdBagMovementHistoryResponse | null>(null);
   const [recurringForm, setRecurringForm] = useState<{
     description: string;
     amount: string;
@@ -966,6 +990,31 @@ function App() {
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
+  }
+
+  function openHouseholdHistoryModal(bagId: string, bagName: string) {
+    setHouseholdHistoryLoading(true);
+    setHouseholdHistoryData(null);
+    setHouseholdHistoryModal({ bagId, bagName });
+    void loadHouseholdBagMovementHistory(bagId, 0);
+  }
+
+  async function loadHouseholdBagMovementHistory(bagId: string, page: number) {
+    setHouseholdHistoryLoading(true);
+    setHouseholdHistoryData(null);
+    try {
+      const result = await api.getHouseholdBagMovementHistory(bagId, page, 3);
+      setHouseholdHistoryData(result);
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    } finally {
+      setHouseholdHistoryLoading(false);
+    }
+  }
+
+  function goToHistoryPage(page: number) {
+    if (!householdHistoryModal) return;
+    void loadHouseholdBagMovementHistory(householdHistoryModal.bagId, page);
   }
 
   function applyHouseholdBagsResult(result: ListHouseholdBagsResponse) {
@@ -1971,6 +2020,90 @@ function App() {
         </div>
       ) : null}
 
+      {householdHistoryModal ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setHouseholdHistoryModal(null)}>
+          <div
+            className="modal large"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="household-history-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="household-history-title">
+              Historial de movimientos - {householdHistoryModal.bagName}
+            </h3>
+
+            {householdHistoryLoading ? (
+              <p className="muted">Cargando historial...</p>
+            ) : householdHistoryData ? (
+              householdHistoryData.movements.length === 0 ? (
+                <p className="muted">No hay movimientos registrados para esta bolsa.</p>
+              ) : (
+                <>
+                  <div className="table-wrap scrollable-md">
+                    <table className="card-table">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Tipo</th>
+                          <th>Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {householdHistoryData.movements.map((movement) => (
+                          <tr key={movement.id}>
+                            <td data-label="Fecha">{formatDateTime(movement.createdAt)}</td>
+                            <td data-label="Tipo">
+                              <span className={`badge ${movement.type === "EXPENSE" ? "danger" : movement.type === "RESET" ? "warning" : "success"}`}>
+                                {getMovementTypeLabel(movement.type)}
+                              </span>
+                            </td>
+                            <td data-label="Monto" className={movement.type === "EXPENSE" ? "text-danger" : ""}>
+                              {getMovementAmount(movement.amount, movement.type)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {householdHistoryData.totalPages > 1 ? (
+                    <div className="pagination-controls" style={{ marginTop: "3rem" }}>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => goToHistoryPage(householdHistoryData.page - 1)}
+                        disabled={householdHistoryData.page <= 0}
+                      >
+                        Anterior
+                      </button>
+                      <p className="muted">
+                        Página {householdHistoryData.page + 1} de {householdHistoryData.totalPages}
+                      </p>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => goToHistoryPage(householdHistoryData.page + 1)}
+                        disabled={householdHistoryData.page >= householdHistoryData.totalPages - 1}
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="muted" style={{ marginTop: "3rem", textAlign: "center" }}>
+                      {householdHistoryData.totalElements} movimiento(s)
+                    </p>
+                  )}
+                </>
+              )
+            ) : (
+              <p className="muted">No se pudo cargar el historial.</p>
+            )}
+
+
+          </div>
+        </div>
+      ) : null}
+
       {bootLoading ? <div className="panel">Cargando datos iniciales...</div> : null}
 
       {!bootLoading && session && !session.mustChangePassword && (
@@ -2429,6 +2562,14 @@ function App() {
                         <p className="muted">
                           Presupuesto: {formatCurrency(item.monthlyAmount)} | Gastado: {formatCurrency(item.spentAmount)}
                         </p>
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ marginTop: "0.5rem" }}
+                          onClick={() => openHouseholdHistoryModal(item.id, item.name)}
+                        >
+                          Ver historial
+                        </button>
                       </div>
                     ))}
                   </div>

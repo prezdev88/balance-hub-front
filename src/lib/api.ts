@@ -6,6 +6,7 @@ import type {
   DebtorAccessResponse,
   ConfigureHouseholdBudgetResponse,
   GetDebtDetailResponse,
+  GetHouseholdBagMovementHistoryResponse,
   GetHouseholdBudgetSummaryResponse,
   ListHouseholdBagsResponse,
   CreatePendingResponse,
@@ -216,6 +217,12 @@ export const api = {
       method: "POST",
       bodyJson: { amount: payload.amount }
     });
+  },
+  getHouseholdBagMovementHistory(bagId: string, page = 0, size = 3) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    return request<GetHouseholdBagMovementHistoryResponse>(
+      `/api/household-budgets/${bagId}/movements?${params.toString()}`
+    );
   },
   resetHouseholdBag(bagId: string) {
     return request<ResetHouseholdBagResponse>(`/api/household-budgets/${bagId}/reset`, {

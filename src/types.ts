@@ -146,6 +146,22 @@ export type RegisterHouseholdBagMovementResponse = {
   updatedAt: string;
 };
 
+export type HouseholdBagMovementHistoryItem = {
+  id: string;
+  amount: string;
+  type: "EXPENSE" | "ADJUSTMENT" | "RESET";
+  createdAt: string;
+};
+
+export type GetHouseholdBagMovementHistoryResponse = {
+  bagId: string;
+  movements: HouseholdBagMovementHistoryItem[];
+  page: number;
+  size: number;
+  totalPages: number;
+  totalElements: number;
+};
+
 export type ResetHouseholdBagResponse = {
   bagId: string;
   monthlyAmount: string;
