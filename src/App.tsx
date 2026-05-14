@@ -432,6 +432,10 @@ function App() {
     bagId: "",
     amount: ""
   });
+  const [pendingHouseholdBagDelete, setPendingHouseholdBagDelete] = useState<{
+    bagId: string;
+    bagName: string;
+  } | null>(null);
   const [householdHistoryModal, setHouseholdHistoryModal] = useState<{
     bagId: string;
     bagName: string;
@@ -987,6 +991,19 @@ function App() {
       await loadHouseholdBudgetSummary();
       const bagName = getHouseholdBagName(bagId);
       setNotice({ type: "success", text: `${bagName} reiniciada al monto original.` });
+    } catch (error) {
+      setNotice({ type: "error", text: toErrorMessage(error) });
+    }
+  }
+
+  async function handleDeleteHouseholdBag() {
+    if (!pendingHouseholdBagDelete) return;
+    setNotice(null);
+    try {
+      await api.deleteHouseholdBag(pendingHouseholdBagDelete.bagId);
+      setPendingHouseholdBagDelete(null);
+      await loadHouseholdBudgetSummary();
+      setNotice({ type: "success", text: `${pendingHouseholdBagDelete.bagName} eliminada correctamente.` });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
     }
@@ -1790,6 +1807,31 @@ function App() {
                 ✓ Pagar sueldo
               </button>
               <button type="button" className="secondary" onClick={() => setPendingSalaryPayment(null)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingHouseholdBagDelete ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setPendingHouseholdBagDelete(null)}>
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-household-bag-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="delete-household-bag-title">Confirmar eliminación</h3>
+            <p>
+              ¿Deseas eliminar la bolsa <strong>{pendingHouseholdBagDelete.bagName}</strong>?
+            </p>
+            <div className="form-actions split">
+              <button type="button" className="danger" onClick={() => void handleDeleteHouseholdBag()}>
+                Sí, eliminar
+              </button>
+              <button type="button" className="secondary" onClick={() => setPendingHouseholdBagDelete(null)}>
                 Cancelar
               </button>
             </div>
@@ -2730,13 +2772,22 @@ function App() {
                               Actual: {formatCurrency(item.remainingAmount)} | Original: {formatCurrency(item.monthlyAmount)}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => void handleResetHouseholdBudget(item.id)}
-                          >
-                            Reset
-                          </button>
+                          <div className="item-actions">
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => void handleResetHouseholdBudget(item.id)}
+                            >
+                              Reset
+                            </button>
+                            <button
+                              type="button"
+                              className="danger"
+                              onClick={() => setPendingHouseholdBagDelete({ bagId: item.id, bagName: item.name })}
+                            >
+                              Eliminar
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

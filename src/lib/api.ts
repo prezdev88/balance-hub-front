@@ -224,6 +224,11 @@ export const api = {
       `/api/household-budgets/${bagId}/movements?${params.toString()}`
     );
   },
+  deleteHouseholdBag(bagId: string) {
+    return request<void>(`/api/household-budgets/${bagId}`, {
+      method: "DELETE"
+    });
+  },
   resetHouseholdBag(bagId: string) {
     return request<ResetHouseholdBagResponse>(`/api/household-budgets/${bagId}/reset`, {
       method: "POST"
