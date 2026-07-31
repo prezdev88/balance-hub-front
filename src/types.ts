@@ -221,6 +221,7 @@ export type UnpaidInstallmentByMonthItem = {
   totalInstallments: number;
   dueDate: string;
   amount: string;
+  totalDebtAmount: string;
   paid: boolean;
   paidAt: string | null;
 };

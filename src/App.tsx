@@ -2408,6 +2408,7 @@ function App() {
                         <th>Estado</th>
                         <th>Pertenece a</th>
                         <th>Cuota</th>
+                        <th>Deuda total</th>
                         <th>Sueldo</th>
                         <th>Acción</th>
                       </tr>
@@ -2415,7 +2416,7 @@ function App() {
                     <tbody>
                       {!unpaidByMonthResult || unpaidByMonthResult.installments.length === 0 ? (
                         <tr>
-                          <td className="table-empty" colSpan={7}>
+                          <td className="table-empty" colSpan={8}>
                             No hay cuotas para este filtro.
                           </td>
                         </tr>
@@ -2441,6 +2442,7 @@ function App() {
                             <td data-label="Cuota">
                               {item.installmentNumber}/{item.totalInstallments}
                             </td>
+                            <td data-label="Deuda total">{formatCurrency(item.totalDebtAmount)}</td>
                             <td data-label="Sueldo">{formatCurrency(salarySnapshot?.salaryColumnAmount ?? salaryPreviewAmount)}</td>
                             <td data-label="Acción">
                               {item.paid || !isAdmin || !salarySnapshot || salarySnapshot.status !== "PAID" ? (
