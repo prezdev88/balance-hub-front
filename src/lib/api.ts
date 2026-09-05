@@ -212,10 +212,11 @@ export const api = {
   registerHouseholdBagMovement(payload: {
     bagId: string;
     amount: number;
+    detail?: string;
   }) {
     return request<RegisterHouseholdBagMovementResponse>(`/api/household-budgets/${payload.bagId}/movements`, {
       method: "POST",
-      bodyJson: { amount: payload.amount }
+      bodyJson: { amount: payload.amount, detail: payload.detail }
     });
   },
   getHouseholdBagMovementHistory(bagId: string, page = 0, size = 3) {

@@ -151,6 +151,7 @@ export type HouseholdBagMovementHistoryItem = {
   amount: string;
   type: "EXPENSE" | "ADJUSTMENT" | "RESET";
   createdAt: string;
+  detail?: string;
 };
 
 export type GetHouseholdBagMovementHistoryResponse = {

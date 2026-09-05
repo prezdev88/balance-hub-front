@@ -1488,6 +1488,10 @@ th {
     overflow: visible;
   }
 
+  .table-wrap.scrollable-md {
+    max-height: none;
+  }
+
   .salary-summary-row {
     gap: 1rem;
     margin-top: 1.45rem;

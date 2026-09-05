@@ -428,9 +428,11 @@ function App() {
   const [householdExpenseForm, setHouseholdExpenseForm] = useState<{
     bagId: string;
     amount: string;
+    detail: string;
   }>({
     bagId: "",
-    amount: ""
+    amount: "",
+    detail: ""
   });
   const [pendingHouseholdBagDelete, setPendingHouseholdBagDelete] = useState<{
     bagId: string;
@@ -974,10 +976,11 @@ function App() {
       }
       await api.registerHouseholdBagMovement({
         bagId: householdExpenseForm.bagId,
-        amount
+        amount,
+        detail: householdExpenseForm.detail || undefined
       });
       await loadHouseholdBudgetSummary();
-      setHouseholdExpenseForm((current) => ({ ...current, amount: "" }));
+      setHouseholdExpenseForm((current) => ({ ...current, amount: "", detail: "" }));
       setNotice({ type: "success", text: "Movimiento registrado." });
     } catch (error) {
       setNotice({ type: "error", text: toErrorMessage(error) });
@@ -2088,6 +2091,7 @@ function App() {
                         <tr>
                           <th>Fecha</th>
                           <th>Tipo</th>
+                          <th>Detalle</th>
                           <th>Monto</th>
                         </tr>
                       </thead>
@@ -2100,6 +2104,7 @@ function App() {
                                 {getMovementTypeLabel(movement.type)}
                               </span>
                             </td>
+                            <td data-label="Detalle">{movement.detail || "-"}</td>
                             <td data-label="Monto" className={movement.type === "EXPENSE" ? "text-danger" : ""}>
                               {getMovementAmount(movement.amount, movement.type)}
                             </td>
@@ -2596,28 +2601,6 @@ function App() {
 
               {householdSubTab === "spend" ? (
                 <>
-                  <div className="summary-row household-summary-row">
-                    {(householdBudgetResult?.bags ?? []).map((item) => (
-                      <div className="stat household-balance-card" key={item.id}>
-                        <span className="household-category-label">
-                          {getHouseholdBagLabel(item.name, item.emoji)}
-                        </span>
-                        <strong>{formatCurrency(item.remainingAmount)}</strong>
-                        <p className="muted">
-                          Presupuesto: {formatCurrency(item.monthlyAmount)} | Gastado: {formatCurrency(item.spentAmount)}
-                        </p>
-                        <button
-                          type="button"
-                          className="secondary"
-                          style={{ marginTop: "0.5rem" }}
-                          onClick={() => openHouseholdHistoryModal(item.id, item.name)}
-                        >
-                          Ver historial
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
                   <div className="subpanel household-primary household-form-panel">
                     <h3>Registrar gasto</h3>
                     <form className="form-grid compact" onSubmit={handleRegisterHouseholdExpense}>
@@ -2655,10 +2638,46 @@ function App() {
                           required
                         />
                       </label>
+                      <label>
+                        Detalle (opcional)
+                        <input
+                          type="text"
+                          value={householdExpenseForm.detail}
+                          onChange={(event) =>
+                            setHouseholdExpenseForm((current) => ({
+                              ...current,
+                              detail: event.target.value
+                            }))
+                          }
+                          placeholder="Ej. Supermercado"
+                        />
+                      </label>
                       <div className="form-actions">
                         <button type="submit">Descontar gasto</button>
                       </div>
                     </form>
+                  </div>
+
+                  <div className="summary-row household-summary-row">
+                    {(householdBudgetResult?.bags ?? []).map((item) => (
+                      <div className="stat household-balance-card" key={item.id}>
+                        <span className="household-category-label">
+                          {getHouseholdBagLabel(item.name, item.emoji)}
+                        </span>
+                        <strong>{formatCurrency(item.remainingAmount)}</strong>
+                        <p className="muted">
+                          Presupuesto: {formatCurrency(item.monthlyAmount)} | Gastado: {formatCurrency(item.spentAmount)}
+                        </p>
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ marginTop: "0.5rem" }}
+                          onClick={() => openHouseholdHistoryModal(item.id, item.name)}
+                        >
+                          Ver historial
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </>
               ) : (
